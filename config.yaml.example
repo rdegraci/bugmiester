@@ -1,0 +1,48 @@
+llm:
+  # openai | anthropic | grok | mock
+  provider: openai
+  # Optional override; defaults applied per provider when null
+  base_url: null
+  # Prefer a fast/cheap model for generation (10 calls/round)
+  model: gpt-4o-mini
+  temperature: 0.4
+  judge_temperature: 0.0
+  timeout_seconds: 60
+
+game:
+  bugs_per_round: 10
+  language: swift
+
+scoring:
+  mode: hybrid              # keyword | llm_judge | hybrid (MVP default: hybrid)
+  points_per_bug: 10
+  partial_credit: true
+  # When judge is unsure, prefer partial / soft correct over harsh wrong
+  generosity: prefer_partial_on_low_confidence
+
+freshness:
+  avoid_list_max: 20
+  similarity_reject_threshold: 0.72
+  # Total generate attempts per bug including the first (JSON repair + freshness share this)
+  max_generate_attempts: 2
+
+resilience:
+  max_judge_calls_per_submit: 1
+  use_canned_fallback_on_generate_exhaustion: true
+  prefetch_next_bug: true          # start next generate while player answers (optional)
+
+metrics:
+  log_per_bug: true                # latency, generate_attempts, freshness_rejects, judge_called
+  log_dir_name: logs               # under Application Support
+
+reports:
+  enabled: true
+  dir_name: reports                # under Application Support
+
+feedback:
+  analyze_on_ops_load: true
+  # Post-MVP: suggestion_llm: true, auto_apply_seed_weights: false
+
+server:
+  host: 127.0.0.1
+  port: 8765

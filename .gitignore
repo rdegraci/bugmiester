@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+# Env / secrets (never commit real keys)
+.env
+!.env.example
+# Accidental local config in repo root (real config lives in Application Support)
+config.yaml
+!config.yaml.example
+# Local / OS
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+# Local runtime artifacts if created in-repo
+logs/
+reports/
+feedback/
+*.log
+# Docs
+docs/cache/
