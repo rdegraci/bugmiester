@@ -23,11 +23,16 @@
     btnPlayAgain: document.getElementById("btn-play-again"),
     modalScore: document.getElementById("modal-score"),
     modalPossible: document.getElementById("modal-possible"),
+    roundCompleteModal: document.getElementById("round-complete-modal"),
   };
 
   const state = {
     busy: false,
     hasFeedback: false,
+    roundId: null,
+    snippetId: null,
+    roundComplete: false,
+    configReady: false,
   };
 
   function setHidden(el, hidden) {
@@ -37,7 +42,6 @@
   }
 
   function setCode(text) {
-    // Always textContent — never innerHTML for snippet text.
     els.codeContent.textContent = text;
   }
 
@@ -45,13 +49,33 @@
     els.progressStatus.textContent = message || "";
   }
 
+  function updateRoundChrome(data) {
+    if (typeof data.bugs_per_round === "number") {
+      els.bugsPerRound.textContent = String(data.bugs_per_round);
+    }
+    if (typeof data.round_score === "number") {
+      els.roundScore.textContent = String(data.round_score);
+    }
+    if (typeof data.round_possible === "number") {
+      els.roundPossible.textContent = String(data.round_possible);
+    }
+    if (typeof data.index === "number" && typeof data.bugs_per_round === "number") {
+      // Display 1-based while a bug is active; 0 before first next-bug.
+      const display =
+        state.snippetId != null ? data.index + 1 : Math.min(data.index, data.bugs_per_round);
+      els.bugIndex.textContent = String(display);
+    }
+  }
+
   function setBusy(busy) {
     state.busy = busy;
+    const answering = Boolean(state.snippetId) && !state.hasFeedback && !state.roundComplete;
     els.btnStart.disabled = busy;
-    els.btnSubmit.disabled = busy || !els.answerInput.value.trim();
-    els.btnNext.disabled = busy || !state.hasFeedback;
+    els.btnSubmit.disabled = busy || !answering || !els.answerInput.value.trim();
+    els.btnNext.disabled =
+      busy || !state.hasFeedback || state.roundComplete || !state.roundId;
     els.btnReport.disabled = busy || !state.hasFeedback;
-    els.answerInput.disabled = busy;
+    els.answerInput.disabled = busy || !answering;
   }
 
   function showSetupBanner(message) {
@@ -68,6 +92,7 @@
       envPath ? `env_path: ${envPath}` : "",
       data.missing_key ? `missing_key: ${data.missing_key}` : "",
       data.config_path ? `config_path: ${data.config_path}` : "",
+      "For Slice 05, set llm.provider: mock in config.yaml",
     ].filter(Boolean);
     showSetupBanner(parts.join(" · "));
   }
@@ -76,18 +101,27 @@
     setHidden(els.setupBanner, true);
   }
 
-  function showFeedback(message, expected) {
-    els.feedbackText.textContent = message;
-    els.expectedSummary.textContent = expected
-      ? `Expected: ${expected}`
+  function showFeedback(result) {
+    els.feedbackText.textContent = result.feedback || "";
+    els.expectedSummary.textContent = result.expected_summary
+      ? `Expected: ${result.expected_summary}`
       : "";
-    els.feedbackPanel.classList.remove("alert-success", "alert-danger", "alert-warning");
-    els.feedbackPanel.classList.add("alert-secondary");
+    els.feedbackPanel.classList.remove(
+      "alert-success",
+      "alert-danger",
+      "alert-warning",
+      "alert-secondary"
+    );
+    if (result.correct) {
+      els.feedbackPanel.classList.add("alert-success");
+    } else if (result.partial) {
+      els.feedbackPanel.classList.add("alert-warning");
+    } else {
+      els.feedbackPanel.classList.add("alert-danger");
+    }
     setHidden(els.feedbackPanel, false);
     state.hasFeedback = true;
     setHidden(els.btnReport, false);
-    els.btnReport.disabled = false;
-    els.btnNext.disabled = false;
   }
 
   function clearFeedback() {
@@ -96,58 +130,149 @@
     els.expectedSummary.textContent = "";
     state.hasFeedback = false;
     setHidden(els.btnReport, true);
-    els.btnReport.disabled = true;
-    els.btnNext.disabled = true;
   }
 
   function setDegraded(visible) {
     setHidden(els.degradedIndicator, !visible);
   }
 
-  // Placeholder handlers — real API wiring comes in later slices.
-  function onStart() {
-    if (state.busy) return;
-    setBusy(true);
-    setProgress("Start round (not connected yet).");
-    clearFeedback();
-    setDegraded(false);
-    setCode("// Slice 03 shell — connect APIs in Slice 05+.");
-    els.answerInput.value = "";
-    els.answerInput.disabled = false;
-    els.btnSubmit.disabled = true;
-    setBusy(false);
-    setProgress("");
+  function showRoundCompleteModal(result) {
+    const score =
+      (result.summary && result.summary.round_score) || result.round_score || 0;
+    const possible =
+      (result.summary && result.summary.round_possible) ||
+      result.round_possible ||
+      100;
+    els.modalScore.textContent = String(score);
+    els.modalPossible.textContent = String(possible);
+    if (window.bootstrap && els.roundCompleteModal) {
+      const modal = window.bootstrap.Modal.getOrCreateInstance(
+        els.roundCompleteModal
+      );
+      modal.show();
+    }
   }
 
-  function onSubmit(event) {
-    event.preventDefault();
+  async function api(path, options) {
+    const response = await fetch(path, {
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      ...options,
+    });
+    let data = null;
+    try {
+      data = await response.json();
+    } catch (_err) {
+      data = null;
+    }
+    if (!response.ok) {
+      const detail =
+        (data && data.detail && data.detail.message) ||
+        (data && data.detail) ||
+        response.statusText;
+      const err = new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+      err.status = response.status;
+      err.data = data;
+      throw err;
+    }
+    return data;
+  }
+
+  async function fetchNextBug() {
+    setProgress(
+      `Generating bug ${(Number(els.bugIndex.textContent) || 0) + 1}/${els.bugsPerRound.textContent}…`
+    );
+    const bug = await api("/api/round/next-bug", {
+      method: "POST",
+      body: JSON.stringify({ round_id: state.roundId }),
+    });
+    state.snippetId = bug.snippet_id;
+    state.hasFeedback = false;
+    state.roundComplete = false;
+    updateRoundChrome(bug);
+    setCode(bug.code || "");
+    setDegraded(Boolean(bug.degraded));
+    els.answerInput.value = "";
+    clearFeedback();
+    setProgress("");
+    setBusy(false);
+  }
+
+  async function onStart() {
     if (state.busy) return;
+    setBusy(true);
+    clearFeedback();
+    setDegraded(false);
+    state.snippetId = null;
+    state.roundComplete = false;
+    try {
+      setProgress("Starting round…");
+      const started = await api("/api/round/start", { method: "POST", body: "{}" });
+      state.roundId = started.round_id;
+      updateRoundChrome(started);
+      els.bugIndex.textContent = "0";
+      await fetchNextBug();
+    } catch (err) {
+      setProgress("");
+      setCode("Could not start round.");
+      showSetupBanner(err.message || "Failed to start round");
+      setBusy(false);
+    }
+  }
+
+  async function onSubmit(event) {
+    event.preventDefault();
+    if (state.busy || !state.roundId || !state.snippetId || state.hasFeedback) return;
     const answer = els.answerInput.value.trim();
     if (!answer) return;
     setBusy(true);
-    setProgress("Submit (not connected yet).");
-    showFeedback(
-      "Placeholder feedback — scoring API not wired yet.",
-      "Expected summary will appear here."
-    );
-    setBusy(false);
-    setProgress("");
+    setProgress("Scoring…");
+    try {
+      const result = await api("/api/round/submit", {
+        method: "POST",
+        body: JSON.stringify({
+          round_id: state.roundId,
+          snippet_id: state.snippetId,
+          answer,
+        }),
+      });
+      updateRoundChrome(result);
+      showFeedback(result);
+      state.roundComplete = Boolean(result.round_complete);
+      setProgress("");
+      setBusy(false);
+      if (result.round_complete) {
+        showRoundCompleteModal(result);
+        els.btnNext.disabled = true;
+      }
+    } catch (err) {
+      setProgress("");
+      showFeedback({
+        correct: false,
+        partial: false,
+        feedback: err.message || "Submit failed",
+        expected_summary: "",
+      });
+      setBusy(false);
+    }
   }
 
-  function onNext() {
-    if (state.busy || !state.hasFeedback) return;
+  async function onNext() {
+    if (state.busy || !state.hasFeedback || state.roundComplete || !state.roundId) {
+      return;
+    }
     setBusy(true);
-    setProgress("Next bug (not connected yet).");
-    clearFeedback();
-    setCode("// Next snippet will load here.");
-    els.answerInput.value = "";
-    setBusy(false);
-    setProgress("");
+    try {
+      await fetchNextBug();
+    } catch (err) {
+      setProgress("");
+      setCode(err.message || "Could not load next bug.");
+      setBusy(false);
+    }
   }
 
   function onReport() {
     if (state.busy || !state.hasFeedback) return;
-    setProgress("Report snippet (not connected yet).");
+    setProgress("Report snippet (Slice 08).");
   }
 
   function onPlayAgain() {
@@ -155,7 +280,8 @@
   }
 
   function onAnswerInput() {
-    els.btnSubmit.disabled = state.busy || !els.answerInput.value.trim();
+    const answering = Boolean(state.snippetId) && !state.hasFeedback && !state.roundComplete;
+    els.btnSubmit.disabled = state.busy || !answering || !els.answerInput.value.trim();
   }
 
   els.btnStart.addEventListener("click", onStart);
@@ -170,13 +296,13 @@
       const response = await fetch("/api/health");
       if (!response.ok) return;
       const data = await response.json();
+      state.configReady = Boolean(data.config_ready);
       if (data && data.config_ready === false) {
         showSetupFromHealth(data);
       } else {
         hideSetupBanner();
       }
     } catch (_err) {
-      // file:// or server down
       hideSetupBanner();
     }
   }
