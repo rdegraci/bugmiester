@@ -60,6 +60,18 @@
     setHidden(els.setupBanner, false);
   }
 
+  function showSetupFromHealth(data) {
+    const missing = data.missing_key || "API key";
+    const envPath = data.env_path || "";
+    const parts = [
+      data.message || `Set ${missing} in ${envPath}`,
+      envPath ? `env_path: ${envPath}` : "",
+      data.missing_key ? `missing_key: ${data.missing_key}` : "",
+      data.config_path ? `config_path: ${data.config_path}` : "",
+    ].filter(Boolean);
+    showSetupBanner(parts.join(" · "));
+  }
+
   function hideSetupBanner() {
     setHidden(els.setupBanner, true);
   }
@@ -153,19 +165,18 @@
   els.btnPlayAgain.addEventListener("click", onPlayAgain);
   els.answerInput.addEventListener("input", onAnswerInput);
 
-  // Safe no-op health probe for later slices; ignore failures offline.
   async function probeHealth() {
     try {
       const response = await fetch("/api/health");
       if (!response.ok) return;
       const data = await response.json();
       if (data && data.config_ready === false) {
-        showSetupBanner(data.message || "Configure your API key to play.");
+        showSetupFromHealth(data);
       } else {
         hideSetupBanner();
       }
     } catch (_err) {
-      // File:// or no server — stay quiet in Slice 03.
+      // file:// or server down
       hideSetupBanner();
     }
   }
