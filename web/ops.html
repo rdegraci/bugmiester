@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bugmiester Ops</title>
+    <link rel="stylesheet" href="vendor/bootstrap/bootstrap.min.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="d-flex flex-column min-vh-100">
+    <main class="container py-4 flex-grow-1">
+      <header class="mb-4 d-flex flex-wrap justify-content-between align-items-end gap-2">
+        <div>
+          <p class="brand-mark mb-1">Bugmiester Ops</p>
+          <p class="text-secondary mb-0">Local reports and round metrics.</p>
+        </div>
+        <a class="btn btn-outline-secondary btn-sm" href="index.html">Back to game</a>
+      </header>
+
+      <section class="mb-3">
+        <button type="button" id="btn-analyze" class="btn btn-primary btn-sm">
+          Run analyze
+        </button>
+      </section>
+
+      <section
+        id="ops-summary"
+        class="border rounded p-3"
+        style="border-color: var(--bm-line) !important; background: var(--bm-panel)"
+        aria-live="polite"
+      >
+        <p id="ops-summary-placeholder" class="text-secondary mb-0">
+          Summary will load here.
+        </p>
+        <pre id="ops-summary-body" class="code-well d-none mb-0" hidden></pre>
+      </section>
+    </main>
+
+    <footer class="border-top py-3 mt-auto">
+      <div class="container small text-secondary">
+        <a href="index.html">Game</a>
+        · localhost ops dashboard
+      </div>
+    </footer>
+
+    <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="ops.js"></script>
+  </body>
+</html>

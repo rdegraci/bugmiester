@@ -1,0 +1,102 @@
+:root {
+  --bm-bg: #0e141b;
+  --bm-panel: #16202a;
+  --bm-code: #0a1016;
+  --bm-ink: #e8eef4;
+  --bm-muted: #8b9aab;
+  --bm-accent: #f0a202;
+  --bm-line: #2a3a4a;
+}
+
+body {
+  background:
+    radial-gradient(ellipse at top, #1a2836 0%, var(--bm-bg) 55%),
+    var(--bm-bg);
+  color: var(--bm-ink);
+}
+
+.brand-mark {
+  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--bm-ink);
+  border-bottom: 3px solid var(--bm-accent);
+  display: inline-block;
+  padding-bottom: 0.15rem;
+}
+
+.text-secondary {
+  color: var(--bm-muted) !important;
+}
+
+.code-well {
+  background: var(--bm-code);
+  border: 1px solid var(--bm-line);
+  border-radius: 0.5rem;
+  color: #d7e0ea;
+  font-family: "SF Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  max-height: min(50vh, 28rem);
+  overflow: auto;
+  padding: 1rem 1.1rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.code-well code {
+  color: inherit;
+  font-family: inherit;
+}
+
+.form-control,
+.form-control:focus {
+  background-color: var(--bm-panel);
+  border-color: var(--bm-line);
+  color: var(--bm-ink);
+}
+
+.form-control:disabled {
+  background-color: #121820;
+  color: var(--bm-muted);
+}
+
+.form-label {
+  color: var(--bm-ink);
+}
+
+.btn-primary {
+  background-color: var(--bm-accent);
+  border-color: var(--bm-accent);
+  color: #1a1200;
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+  background-color: #ffb41a;
+  border-color: #ffb41a;
+  color: #1a1200;
+}
+
+.border-top {
+  border-color: var(--bm-line) !important;
+}
+
+.modal-content {
+  background-color: var(--bm-panel);
+  color: var(--bm-ink);
+}
+
+.modal-header,
+.modal-footer {
+  border-color: var(--bm-line);
+}
+
+a {
+  color: var(--bm-accent);
+}
+
+a:hover {
+  color: #ffb41a;
+}

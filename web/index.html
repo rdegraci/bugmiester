@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bugmiester</title>
+    <link rel="stylesheet" href="vendor/bootstrap/bootstrap.min.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="d-flex flex-column min-vh-100">
+    <main class="container py-4 flex-grow-1">
+      <header class="mb-4">
+        <p class="brand-mark mb-1">Bugmiester</p>
+        <p class="text-secondary mb-0">Spot the one bug in each Swift snippet.</p>
+      </header>
+
+      <div
+        id="setup-banner"
+        class="alert alert-warning d-none"
+        role="status"
+        hidden
+      >
+        <strong>Setup required.</strong>
+        <span id="setup-banner-message">Configure your API key to play.</span>
+      </div>
+
+      <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+        <div id="round-status" class="text-secondary">
+          Bug <span id="bug-index">0</span> / <span id="bugs-per-round">10</span>
+          · Score <span id="round-score">0</span> /
+          <span id="round-possible">100</span>
+        </div>
+        <div id="progress-status" class="text-secondary small" aria-live="polite"></div>
+        <div
+          id="degraded-indicator"
+          class="badge text-bg-secondary d-none"
+          hidden
+        >
+          Offline fallback snippet
+        </div>
+      </div>
+
+      <section class="mb-3" aria-label="Code snippet">
+        <pre id="code-well" class="code-well mb-0"><code id="code-content">Start a round to load a Swift snippet.</code></pre>
+      </section>
+
+      <form id="answer-form" class="mb-3">
+        <label for="answer-input" class="form-label">What is the bug?</label>
+        <textarea
+          id="answer-input"
+          class="form-control"
+          rows="3"
+          placeholder="Describe the bug in a short sentence"
+          disabled
+        ></textarea>
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          <button type="button" id="btn-start" class="btn btn-primary">
+            Start round
+          </button>
+          <button type="submit" id="btn-submit" class="btn btn-success" disabled>
+            Submit
+          </button>
+          <button type="button" id="btn-next" class="btn btn-outline-primary" disabled>
+            Next bug
+          </button>
+          <button
+            type="button"
+            id="btn-report"
+            class="btn btn-outline-secondary d-none"
+            hidden
+            disabled
+          >
+            Report snippet
+          </button>
+        </div>
+      </form>
+
+      <div
+        id="feedback-panel"
+        class="alert d-none"
+        role="status"
+        hidden
+      >
+        <div id="feedback-text"></div>
+        <div id="expected-summary" class="small mt-2 text-secondary"></div>
+      </div>
+    </main>
+
+    <footer class="border-top py-3 mt-auto">
+      <div class="container d-flex justify-content-between small text-secondary">
+        <span>Localhost only · API keys stay on this machine</span>
+        <a href="ops.html">Ops</a>
+      </div>
+    </footer>
+
+    <div
+      class="modal fade"
+      id="round-complete-modal"
+      tabindex="-1"
+      aria-labelledby="round-complete-title"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h1 class="modal-title fs-5" id="round-complete-title">Round complete</h1>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <p id="round-complete-body" class="mb-0">
+              Score <span id="modal-score">0</span> /
+              <span id="modal-possible">100</span>
+            </p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+              Close
+            </button>
+            <button type="button" id="btn-play-again" class="btn btn-primary">
+              Play again
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
