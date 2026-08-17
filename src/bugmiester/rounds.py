@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 import uuid
 from collections import deque
 from dataclasses import dataclass, field
@@ -16,12 +17,15 @@ from bugmiester.freshness import (
     history_entry,
 )
 from bugmiester.llm.mock_provider import MockProvider
+from bugmiester.metrics import MetricsCollector
 from bugmiester.models import (
     NextBugResponse,
+    ReportSnippetResponse,
     RoundStartResponse,
     RoundSummary,
     SubmitResponse,
 )
+from bugmiester.reports import write_report
 from bugmiester.scoring import score_answer
 
 
@@ -41,6 +45,13 @@ class StoredSnippet:
     answered: bool = False
     generate_attempts: int = 1
     freshness_rejects: int = 0
+    player_answer: str = ""
+    points_awarded: int | None = None
+    points_possible: int | None = None
+    correct: bool | None = None
+    partial: bool | None = None
+    judge_called: bool = False
+    reported: bool = False
 
 
 @dataclass
@@ -65,6 +76,7 @@ class RoundStore:
         self._rounds: dict[str, RoundState] = {}
         self._mock = MockProvider()
         self._history: deque[HistoryEntry] = deque(maxlen=history_maxlen)
+        self.metrics = MetricsCollector()
 
     def start(self, settings: Settings) -> RoundStartResponse:
         round_id = str(uuid.uuid4())
@@ -77,6 +89,14 @@ class RoundStore:
             language=settings.game.language,
         )
         self._rounds[round_id] = state
+        if settings.metrics.log_per_bug:
+            self.metrics.start_round(
+                round_id,
+                bugs_per_round=bugs,
+                provider=settings.llm.provider,
+                model=settings.llm.model,
+                round_possible=bugs * points,
+            )
         return RoundStartResponse(
             round_id=round_id,
             bugs_per_round=bugs,
@@ -108,6 +128,7 @@ class RoundStore:
                 status_code=503,
             )
 
+        started = time.perf_counter()
         generated, degraded, attempts, rejects = generate_with_freshness(
             used_seed_ids=state.used_seed_ids,
             history=list(self._history),
@@ -119,6 +140,8 @@ class RoundStore:
             generate_fn=self._mock.generate_for_seed,
             fallback_fn=fallback_for_seed,
         )
+        generate_ms = (time.perf_counter() - started) * 1000.0
+
         stored = self._store_generated(
             state,
             generated,
@@ -126,6 +149,19 @@ class RoundStore:
             attempts=attempts,
             rejects=rejects,
         )
+        if settings.metrics.log_per_bug:
+            self.metrics.record_generate(
+                round_id,
+                snippet_id=stored.snippet_id,
+                index=stored.index,
+                seed_id=stored.seed_id,
+                generate_ms=generate_ms,
+                generate_attempts=attempts,
+                freshness_rejects=rejects,
+                degraded=degraded,
+                provider=settings.llm.provider,
+                model=settings.llm.model,
+            )
         return NextBugResponse(
             round_id=round_id,
             index=state.index,
@@ -201,6 +237,7 @@ class RoundStore:
             judge_fn = self._mock.judge_answer
         # Live providers: judge_answer wired in later provider slices.
 
+        started = time.perf_counter()
         scored = score_answer(
             code=stored.code,
             expected_summary=stored.bug_summary,
@@ -211,8 +248,16 @@ class RoundStore:
             max_judge_calls=settings.resilience.max_judge_calls_per_submit,
             judge_fn=judge_fn,
         )
+        submit_ms = (time.perf_counter() - started) * 1000.0
 
         stored.answered = True
+        stored.player_answer = answer
+        stored.points_awarded = scored.points_awarded
+        stored.points_possible = scored.points_possible
+        stored.correct = scored.correct
+        stored.partial = scored.partial
+        stored.judge_called = scored.judge_called
+
         state.round_score += scored.points_awarded
         if scored.correct:
             state.correct_count += 1
@@ -221,12 +266,30 @@ class RoundStore:
         else:
             state.incorrect_count += 1
 
+        if settings.metrics.log_per_bug:
+            self.metrics.record_submit(
+                round_id,
+                snippet_id,
+                submit_ms=submit_ms,
+                judge_called=scored.judge_called,
+                points_awarded=scored.points_awarded,
+                correct=scored.correct,
+                partial=scored.partial,
+                round_score=state.round_score,
+            )
+
         answered_index = stored.index
         state.index += 1
         state.pending = None
         round_complete = state.index >= state.bugs_per_round
         if round_complete:
             state.complete = True
+            if settings.metrics.log_per_bug:
+                self.metrics.flush_round(
+                    settings.logs_dir,
+                    round_id,
+                    round_score=state.round_score,
+                )
 
         summary = None
         if round_complete:
@@ -252,6 +315,53 @@ class RoundStore:
             round_complete=round_complete,
             summary=summary,
         )
+
+    def report_snippet(
+        self,
+        round_id: str,
+        snippet_id: str,
+        reason: str,
+        note: str,
+        settings: Settings,
+    ) -> ReportSnippetResponse:
+        if not settings.reports.enabled:
+            raise RoundError("reports_disabled", "Snippet reports are disabled")
+
+        state = self._require(round_id)
+        stored = state.snippets.get(snippet_id)
+        if stored is None:
+            raise RoundError("unknown_snippet", "Unknown snippet_id", status_code=404)
+        if not stored.answered:
+            raise RoundError(
+                "not_answered",
+                "Report is only available after feedback for this snippet",
+            )
+
+        try:
+            write_report(
+                settings.reports_dir,
+                round_id=round_id,
+                snippet_id=snippet_id,
+                reason=reason,
+                note=note,
+                code=stored.code,
+                bug_summary=stored.bug_summary,
+                bug_category=stored.bug_category,
+                seed_id=stored.seed_id,
+                player_answer=stored.player_answer,
+                points_awarded=stored.points_awarded,
+                points_possible=stored.points_possible,
+                correct=stored.correct,
+                partial=stored.partial,
+                provider=settings.llm.provider,
+                model=settings.llm.model,
+                degraded=stored.degraded,
+            )
+        except ValueError as exc:
+            raise RoundError("invalid_reason", str(exc), status_code=400) from exc
+
+        stored.reported = True
+        return ReportSnippetResponse(ok=True)
 
     def summary(self, round_id: str) -> RoundSummary:
         state = self._require(round_id)

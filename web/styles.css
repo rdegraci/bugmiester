@@ -79,6 +79,14 @@ body {
   color: #1a1200;
 }
 
+.report-reason {
+  width: auto;
+  min-width: 11rem;
+  background-color: var(--bm-panel);
+  border-color: var(--bm-line);
+  color: var(--bm-ink);
+}
+
 .border-top {
   border-color: var(--bm-line) !important;
 }

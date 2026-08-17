@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from bugmiester.config import Settings, default_examples_dir, load_settings
-from bugmiester.models import NextBugRequest, SubmitRequest
+from bugmiester.models import NextBugRequest, ReportSnippetRequest, SubmitRequest
 from bugmiester.rounds import RoundError, RoundStore
 
 
@@ -112,6 +112,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 body.round_id,
                 body.snippet_id,
                 body.answer,
+                current,
+            ).model_dump()
+        except RoundError as exc:
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail={"message": exc.message, "code": exc.code},
+            ) from exc
+
+    @app.post("/api/round/report-snippet")
+    def api_round_report_snippet(body: ReportSnippetRequest) -> dict:
+        current = _current_settings(app)
+        store: RoundStore = app.state.rounds
+        try:
+            return store.report_snippet(
+                body.round_id,
+                body.snippet_id,
+                body.reason,
+                body.note,
                 current,
             ).model_dump()
         except RoundError as exc:

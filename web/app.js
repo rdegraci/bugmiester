@@ -17,6 +17,8 @@
     btnSubmit: document.getElementById("btn-submit"),
     btnNext: document.getElementById("btn-next"),
     btnReport: document.getElementById("btn-report"),
+    reportControls: document.getElementById("report-controls"),
+    reportReason: document.getElementById("report-reason"),
     feedbackPanel: document.getElementById("feedback-panel"),
     feedbackText: document.getElementById("feedback-text"),
     expectedSummary: document.getElementById("expected-summary"),
@@ -31,8 +33,10 @@
     hasFeedback: false,
     roundId: null,
     snippetId: null,
+    nextBugNumber: 1,
     roundComplete: false,
     configReady: false,
+    reportedCurrent: false,
   };
 
   function setHidden(el, hidden) {
@@ -42,11 +46,16 @@
   }
 
   function setCode(text) {
+    // Model / API code must never use innerHTML.
     els.codeContent.textContent = text;
   }
 
   function setProgress(message) {
     els.progressStatus.textContent = message || "";
+  }
+
+  function bugsPerRound() {
+    return Number(els.bugsPerRound.textContent) || 10;
   }
 
   function updateRoundChrome(data) {
@@ -59,22 +68,30 @@
     if (typeof data.round_possible === "number") {
       els.roundPossible.textContent = String(data.round_possible);
     }
-    if (typeof data.index === "number" && typeof data.bugs_per_round === "number") {
-      // Display 1-based while a bug is active; 0 before first next-bug.
+    if (typeof data.index === "number") {
       const display =
-        state.snippetId != null ? data.index + 1 : Math.min(data.index, data.bugs_per_round);
+        state.snippetId != null
+          ? data.index + 1
+          : Math.min(data.index, bugsPerRound());
       els.bugIndex.textContent = String(display);
     }
   }
 
   function setBusy(busy) {
     state.busy = busy;
-    const answering = Boolean(state.snippetId) && !state.hasFeedback && !state.roundComplete;
+    const answering =
+      Boolean(state.snippetId) && !state.hasFeedback && !state.roundComplete;
     els.btnStart.disabled = busy;
-    els.btnSubmit.disabled = busy || !answering || !els.answerInput.value.trim();
+    els.btnSubmit.disabled =
+      busy || !answering || !els.answerInput.value.trim();
     els.btnNext.disabled =
       busy || !state.hasFeedback || state.roundComplete || !state.roundId;
-    els.btnReport.disabled = busy || !state.hasFeedback;
+    els.btnReport.disabled =
+      busy || !state.hasFeedback || state.reportedCurrent || !state.snippetId;
+    if (els.reportReason) {
+      els.reportReason.disabled =
+        busy || !state.hasFeedback || state.reportedCurrent;
+    }
     els.answerInput.disabled = busy || !answering;
   }
 
@@ -92,7 +109,6 @@
       envPath ? `env_path: ${envPath}` : "",
       data.missing_key ? `missing_key: ${data.missing_key}` : "",
       data.config_path ? `config_path: ${data.config_path}` : "",
-      "For Slice 05, set llm.provider: mock in config.yaml",
     ].filter(Boolean);
     showSetupBanner(parts.join(" · "));
   }
@@ -121,7 +137,8 @@
     }
     setHidden(els.feedbackPanel, false);
     state.hasFeedback = true;
-    setHidden(els.btnReport, false);
+    state.reportedCurrent = false;
+    setHidden(els.reportControls, false);
   }
 
   function clearFeedback() {
@@ -129,7 +146,8 @@
     els.feedbackText.textContent = "";
     els.expectedSummary.textContent = "";
     state.hasFeedback = false;
-    setHidden(els.btnReport, true);
+    state.reportedCurrent = false;
+    setHidden(els.reportControls, true);
   }
 
   function setDegraded(visible) {
@@ -169,7 +187,9 @@
         (data && data.detail && data.detail.message) ||
         (data && data.detail) ||
         response.statusText;
-      const err = new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+      const err = new Error(
+        typeof detail === "string" ? detail : JSON.stringify(detail)
+      );
       err.status = response.status;
       err.data = data;
       throw err;
@@ -178,16 +198,17 @@
   }
 
   async function fetchNextBug() {
-    setProgress(
-      `Generating bug ${(Number(els.bugIndex.textContent) || 0) + 1}/${els.bugsPerRound.textContent}…`
-    );
+    const n = state.nextBugNumber;
+    setProgress(`Generating bug ${n}/${bugsPerRound()}…`);
     const bug = await api("/api/round/next-bug", {
       method: "POST",
       body: JSON.stringify({ round_id: state.roundId }),
     });
     state.snippetId = bug.snippet_id;
     state.hasFeedback = false;
+    state.reportedCurrent = false;
     state.roundComplete = false;
+    state.nextBugNumber = (typeof bug.index === "number" ? bug.index : n - 1) + 2;
     updateRoundChrome(bug);
     setCode(bug.code || "");
     setDegraded(Boolean(bug.degraded));
@@ -204,9 +225,13 @@
     setDegraded(false);
     state.snippetId = null;
     state.roundComplete = false;
+    state.nextBugNumber = 1;
     try {
       setProgress("Starting round…");
-      const started = await api("/api/round/start", { method: "POST", body: "{}" });
+      const started = await api("/api/round/start", {
+        method: "POST",
+        body: "{}",
+      });
       state.roundId = started.round_id;
       updateRoundChrome(started);
       els.bugIndex.textContent = "0";
@@ -221,7 +246,9 @@
 
   async function onSubmit(event) {
     event.preventDefault();
-    if (state.busy || !state.roundId || !state.snippetId || state.hasFeedback) return;
+    if (state.busy || !state.roundId || !state.snippetId || state.hasFeedback) {
+      return;
+    }
     const answer = els.answerInput.value.trim();
     if (!answer) return;
     setBusy(true);
@@ -257,7 +284,12 @@
   }
 
   async function onNext() {
-    if (state.busy || !state.hasFeedback || state.roundComplete || !state.roundId) {
+    if (
+      state.busy ||
+      !state.hasFeedback ||
+      state.roundComplete ||
+      !state.roundId
+    ) {
       return;
     }
     setBusy(true);
@@ -270,9 +302,36 @@
     }
   }
 
-  function onReport() {
-    if (state.busy || !state.hasFeedback) return;
-    setProgress("Report snippet (Slice 08).");
+  async function onReport() {
+    if (
+      state.busy ||
+      !state.hasFeedback ||
+      !state.roundId ||
+      !state.snippetId ||
+      state.reportedCurrent
+    ) {
+      return;
+    }
+    const reason = (els.reportReason && els.reportReason.value) || "other";
+    setBusy(true);
+    setProgress("Sending report…");
+    try {
+      await api("/api/round/report-snippet", {
+        method: "POST",
+        body: JSON.stringify({
+          round_id: state.roundId,
+          snippet_id: state.snippetId,
+          reason,
+          note: "",
+        }),
+      });
+      state.reportedCurrent = true;
+      setProgress("Report saved.");
+      setBusy(false);
+    } catch (err) {
+      setProgress(err.message || "Report failed");
+      setBusy(false);
+    }
   }
 
   function onPlayAgain() {
@@ -280,8 +339,10 @@
   }
 
   function onAnswerInput() {
-    const answering = Boolean(state.snippetId) && !state.hasFeedback && !state.roundComplete;
-    els.btnSubmit.disabled = state.busy || !answering || !els.answerInput.value.trim();
+    const answering =
+      Boolean(state.snippetId) && !state.hasFeedback && !state.roundComplete;
+    els.btnSubmit.disabled =
+      state.busy || !answering || !els.answerInput.value.trim();
   }
 
   els.btnStart.addEventListener("click", onStart);

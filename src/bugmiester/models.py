@@ -59,5 +59,16 @@ class SubmitResponse(BaseModel):
     summary: RoundSummary | None = None
 
 
+class ReportSnippetRequest(BaseModel):
+    round_id: str
+    snippet_id: str
+    reason: str
+    note: str = ""
+
+
+class ReportSnippetResponse(BaseModel):
+    ok: bool = True
+
+
 def model_dump(obj: BaseModel) -> dict[str, Any]:
     return obj.model_dump()

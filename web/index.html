@@ -63,15 +63,24 @@
           <button type="button" id="btn-next" class="btn btn-outline-primary" disabled>
             Next bug
           </button>
-          <button
-            type="button"
-            id="btn-report"
-            class="btn btn-outline-secondary d-none"
-            hidden
-            disabled
-          >
-            Report snippet
-          </button>
+          <div id="report-controls" class="d-flex flex-wrap align-items-center gap-2 d-none" hidden>
+            <label for="report-reason" class="visually-hidden">Report reason</label>
+            <select id="report-reason" class="form-select form-select-sm report-reason">
+              <option value="ambiguous">ambiguous</option>
+              <option value="does_not_compile">does_not_compile</option>
+              <option value="duplicate">duplicate</option>
+              <option value="unfair_score">unfair_score</option>
+              <option value="other" selected>other</option>
+            </select>
+            <button
+              type="button"
+              id="btn-report"
+              class="btn btn-outline-secondary"
+              disabled
+            >
+              Report snippet
+            </button>
+          </div>
         </div>
       </form>
 
