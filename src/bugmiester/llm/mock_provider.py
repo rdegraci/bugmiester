@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
+
+from bugmiester.freshness import GeneratedSnippet, HistoryEntry, ScenarioSeed
 
 
 @dataclass(frozen=True)
@@ -161,18 +164,84 @@ origin.x = 1
     ),
 )
 
+# Primary mock output keyed by scenario seed_id (aligned with SEED_POOL).
+SEED_SNIPPETS: dict[str, MockSnippet] = {
+    "opt-dict-force": MOCK_SNIPPETS[0],
+    "col-empty-avg": MOCK_SNIPPETS[1],
+    "ref-class-copy": MOCK_SNIPPETS[2],
+    "flow-switch-int": MOCK_SNIPPETS[3],
+    "err-async-try": MOCK_SNIPPETS[4],
+    "col-off-by-one": MOCK_SNIPPETS[5],
+    "opt-greet-print": MOCK_SNIPPETS[6],
+    "err-try-optional": MOCK_SNIPPETS[7],
+    "conc-actor-mut": MOCK_SNIPPETS[8],
+    "val-let-struct": MOCK_SNIPPETS[9],
+    "opt-array-first": MockSnippet(
+        code="""\
+func first(_ values: [Int]) -> Int {
+    return values[0]
+}
+""",
+        bug_summary="Unconditional [0] crashes on an empty array",
+        bug_category="optionals",
+        difficulty="beginner",
+        hints=("Check isEmpty first",),
+        keywords=("empty", "index", "crash", "bounds"),
+    ),
+    "conc-await-miss": MockSnippet(
+        code="""\
+func load() async -> String {
+    return fetchRemote()
+}
+func fetchRemote() async -> String { "ok" }
+""",
+        bug_summary="Missing await when calling an async function",
+        bug_category="concurrency",
+        difficulty="intermediate",
+        hints=("fetchRemote is async",),
+        keywords=("await", "async", "missing"),
+    ),
+}
+
 
 class MockProvider:
-    """Rotates distinct canned snippets; no network calls."""
+    """Seed-aware canned snippets; no network calls."""
 
-    def __init__(self, snippets: tuple[MockSnippet, ...] = MOCK_SNIPPETS) -> None:
+    def __init__(
+        self,
+        snippets: tuple[MockSnippet, ...] = MOCK_SNIPPETS,
+        seed_map: dict[str, MockSnippet] | None = None,
+    ) -> None:
         if not snippets:
             raise ValueError("MockProvider requires at least one snippet")
         self._snippets = snippets
+        self._seed_map = seed_map if seed_map is not None else dict(SEED_SNIPPETS)
         self._cursor = 0
 
+    def generate_for_seed(
+        self,
+        seed: ScenarioSeed,
+        _avoid: Sequence[HistoryEntry] | None = None,
+    ) -> GeneratedSnippet:
+        snip = self._seed_map.get(seed.seed_id)
+        if snip is None:
+            snip = next(
+                (s for s in self._snippets if s.bug_category == seed.category),
+                self._snippets[self._cursor % len(self._snippets)],
+            )
+            self._cursor += 1
+        return GeneratedSnippet(
+            code=snip.code,
+            bug_summary=snip.bug_summary,
+            bug_category=snip.bug_category,
+            difficulty=snip.difficulty,
+            hints=snip.hints,
+            keywords=snip.keywords,
+            seed=seed,
+        )
+
     def next_snippet(self, round_index: int) -> MockSnippet:
-        # Prefer round index for stable variety within a round of 10.
+        """Legacy index rotation (prefer generate_for_seed)."""
         if round_index < len(self._snippets):
             return self._snippets[round_index]
         snippet = self._snippets[self._cursor % len(self._snippets)]

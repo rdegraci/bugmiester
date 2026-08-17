@@ -3,10 +3,19 @@
 from __future__ import annotations
 
 import uuid
+from collections import deque
 from dataclasses import dataclass, field
 
 from bugmiester.config import Settings
-from bugmiester.llm.mock_provider import MockProvider, MockSnippet
+from bugmiester.fallback_snippets import fallback_for_seed
+from bugmiester.freshness import (
+    SEED_POOL,
+    GeneratedSnippet,
+    HistoryEntry,
+    generate_with_freshness,
+    history_entry,
+)
+from bugmiester.llm.mock_provider import MockProvider
 from bugmiester.models import (
     NextBugResponse,
     RoundStartResponse,
@@ -28,7 +37,10 @@ class StoredSnippet:
     bug_category: str
     hints: tuple[str, ...]
     keywords: tuple[str, ...]
+    seed_id: str = ""
     answered: bool = False
+    generate_attempts: int = 1
+    freshness_rejects: int = 0
 
 
 @dataclass
@@ -44,13 +56,15 @@ class RoundState:
     incorrect_count: int = 0
     pending: StoredSnippet | None = None
     snippets: dict[str, StoredSnippet] = field(default_factory=dict)
+    used_seed_ids: set[str] = field(default_factory=set)
     complete: bool = False
 
 
 class RoundStore:
-    def __init__(self) -> None:
+    def __init__(self, history_maxlen: int = 200) -> None:
         self._rounds: dict[str, RoundState] = {}
         self._mock = MockProvider()
+        self._history: deque[HistoryEntry] = deque(maxlen=history_maxlen)
 
     def start(self, settings: Settings) -> RoundStartResponse:
         round_id = str(uuid.uuid4())
@@ -94,33 +108,71 @@ class RoundStore:
                 status_code=503,
             )
 
-        mock_snip: MockSnippet = self._mock.next_snippet(state.index)
-        snippet_id = str(uuid.uuid4())
-        stored = StoredSnippet(
-            snippet_id=snippet_id,
-            index=state.index,
-            language=state.language,
-            code=mock_snip.code,
-            difficulty=mock_snip.difficulty,
-            degraded=False,
-            bug_summary=mock_snip.bug_summary,
-            bug_category=mock_snip.bug_category,
-            hints=mock_snip.hints,
-            keywords=mock_snip.keywords,
+        generated, degraded, attempts, rejects = generate_with_freshness(
+            used_seed_ids=state.used_seed_ids,
+            history=list(self._history),
+            seed_pool=SEED_POOL,
+            max_attempts=settings.freshness.max_generate_attempts,
+            similarity_threshold=settings.freshness.similarity_reject_threshold,
+            avoid_list_max=settings.freshness.avoid_list_max,
+            use_fallback=settings.resilience.use_canned_fallback_on_generate_exhaustion,
+            generate_fn=self._mock.generate_for_seed,
+            fallback_fn=fallback_for_seed,
         )
-        state.pending = stored
-        state.snippets[snippet_id] = stored
-
+        stored = self._store_generated(
+            state,
+            generated,
+            degraded=degraded,
+            attempts=attempts,
+            rejects=rejects,
+        )
         return NextBugResponse(
             round_id=round_id,
             index=state.index,
             bugs_per_round=state.bugs_per_round,
-            snippet_id=snippet_id,
+            snippet_id=stored.snippet_id,
             language=stored.language,
             code=stored.code,
             difficulty=stored.difficulty,
             degraded=stored.degraded,
         )
+
+    def _store_generated(
+        self,
+        state: RoundState,
+        generated: GeneratedSnippet,
+        *,
+        degraded: bool,
+        attempts: int,
+        rejects: int,
+    ) -> StoredSnippet:
+        snippet_id = str(uuid.uuid4())
+        stored = StoredSnippet(
+            snippet_id=snippet_id,
+            index=state.index,
+            language=state.language,
+            code=generated.code,
+            difficulty=generated.difficulty,
+            degraded=degraded,
+            bug_summary=generated.bug_summary,
+            bug_category=generated.bug_category,
+            hints=generated.hints,
+            keywords=generated.keywords,
+            seed_id=generated.seed.seed_id,
+            generate_attempts=attempts,
+            freshness_rejects=rejects,
+        )
+        state.pending = stored
+        state.snippets[snippet_id] = stored
+        self._history.append(
+            history_entry(
+                bug_summary=generated.bug_summary,
+                bug_category=generated.bug_category,
+                theme=generated.seed.theme,
+                code=generated.code,
+            )
+        )
+        return stored
 
     def submit(
         self,
