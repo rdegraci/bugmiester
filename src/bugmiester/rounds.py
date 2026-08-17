@@ -22,7 +22,7 @@ from bugmiester.models import (
     RoundSummary,
     SubmitResponse,
 )
-from bugmiester.scoring import simple_keyword_score
+from bugmiester.scoring import score_answer
 
 
 @dataclass
@@ -196,20 +196,27 @@ class RoundStore:
                 "This snippet is not the active pending bug",
             )
 
-        points_possible = state.points_per_bug
-        correct, partial, awarded, feedback = simple_keyword_score(
-            stored.bug_summary,
-            answer,
-            stored.keywords,
-            points_possible=points_possible,
-            partial_credit=settings.scoring.partial_credit,
+        judge_fn = None
+        if settings.llm.provider == "mock":
+            judge_fn = self._mock.judge_answer
+        # Live providers: judge_answer wired in later provider slices.
+
+        scored = score_answer(
+            code=stored.code,
+            expected_summary=stored.bug_summary,
+            answer=answer,
+            keywords=stored.keywords,
+            bug_category=stored.bug_category,
+            scoring=settings.scoring,
+            max_judge_calls=settings.resilience.max_judge_calls_per_submit,
+            judge_fn=judge_fn,
         )
 
         stored.answered = True
-        state.round_score += awarded
-        if correct:
+        state.round_score += scored.points_awarded
+        if scored.correct:
             state.correct_count += 1
-        elif partial:
+        elif scored.partial:
             state.partial_count += 1
         else:
             state.incorrect_count += 1
@@ -232,16 +239,16 @@ class RoundStore:
             )
 
         return SubmitResponse(
-            correct=correct,
-            partial=partial,
-            points_awarded=awarded,
-            points_possible=points_possible,
+            correct=scored.correct,
+            partial=scored.partial,
+            points_awarded=scored.points_awarded,
+            points_possible=scored.points_possible,
             round_score=state.round_score,
             round_possible=state.bugs_per_round * state.points_per_bug,
             index=answered_index,
             bugs_per_round=state.bugs_per_round,
-            feedback=feedback,
-            expected_summary=stored.bug_summary,
+            feedback=scored.feedback,
+            expected_summary=scored.expected_summary,
             round_complete=round_complete,
             summary=summary,
         )

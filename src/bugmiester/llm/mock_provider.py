@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from bugmiester.freshness import GeneratedSnippet, HistoryEntry, ScenarioSeed
+from bugmiester.scoring import JudgeResult, keyword_match_tier
 
 
 @dataclass(frozen=True)
@@ -247,3 +248,61 @@ class MockProvider:
         snippet = self._snippets[self._cursor % len(self._snippets)]
         self._cursor += 1
         return snippet
+
+    def judge_answer(
+        self,
+        code: str,
+        expected_summary: str,
+        player_answer: str,
+    ) -> JudgeResult:
+        """
+        Deterministic mock judge (no network).
+
+        Uses the same keyword tiering as the scorer so hybrid/llm_judge modes
+        stay exercisable without a live provider. Live LLM judging is Slice 10+.
+        """
+        del code  # available for future richer fixtures
+        # Prefer keywords from a matching canned snippet when present.
+        keywords: tuple[str, ...] = ()
+        for snip in self._snippets:
+            if snip.bug_summary == expected_summary:
+                keywords = snip.keywords
+                break
+        else:
+            for snip in self._seed_map.values():
+                if snip.bug_summary == expected_summary:
+                    keywords = snip.keywords
+                    break
+
+        tier = keyword_match_tier(
+            expected_summary, player_answer, keywords or None
+        )
+        if tier == "strong":
+            return JudgeResult(
+                correct=True,
+                partial=False,
+                feedback=f"Yes — {expected_summary}.",
+                confidence=0.95,
+            )
+        if tier == "weak":
+            return JudgeResult(
+                correct=False,
+                partial=True,
+                feedback=f"Partially correct. Expected: {expected_summary}.",
+                confidence=0.55,
+            )
+        # Ambiguous / empty answers get low confidence so generosity can soften.
+        stripped = player_answer.strip()
+        if len(stripped) < 8:
+            return JudgeResult(
+                correct=False,
+                partial=False,
+                feedback="Too vague to judge confidently.",
+                confidence=0.25,
+            )
+        return JudgeResult(
+            correct=False,
+            partial=False,
+            feedback=f"Not quite. Expected: {expected_summary}.",
+            confidence=0.9,
+        )
