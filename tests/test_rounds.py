@@ -98,6 +98,48 @@ def test_full_mock_round_no_answer_key_leak(tmp_path: Path, monkeypatch) -> None
         assert blocked.status_code == 400
 
 
+def _play_mock_round(client: TestClient) -> list[str]:
+    round_id = client.post("/api/round/start").json()["round_id"]
+    codes: list[str] = []
+    for _ in range(10):
+        bug = client.post(
+            "/api/round/next-bug", json={"round_id": round_id}
+        ).json()
+        codes.append(bug["code"])
+        result = client.post(
+            "/api/round/submit",
+            json={
+                "round_id": round_id,
+                "snippet_id": bug["snippet_id"],
+                "answer": "css grid stylesheet overflow python gil deadlock",
+            },
+        ).json()
+        if result.get("recovery_available"):
+            client.post(
+                "/api/round/recover",
+                json={
+                    "round_id": round_id,
+                    "snippet_id": bug["snippet_id"],
+                    "option_id": None,
+                },
+            )
+    return codes
+
+
+def test_second_round_avoids_recent_seed_snippets(
+    tmp_path: Path, monkeypatch
+) -> None:
+    settings = _mock_settings(tmp_path, monkeypatch)
+    app = create_app(settings=settings)
+    with TestClient(app) as client:
+        first = _play_mock_round(client)
+        second = _play_mock_round(client)
+    assert len(first) == 10
+    assert len(set(first)) == 10
+    assert len(set(second)) == 10
+    assert not set(first) & set(second)
+
+
 def test_next_bug_rejects_openai_without_key(tmp_path: Path, monkeypatch) -> None:
     settings = _mock_settings(tmp_path, monkeypatch)
     # Flip provider to openai with placeholder after settings object created —

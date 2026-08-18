@@ -28,6 +28,7 @@ freshness:
   max_generate_attempts: 2
   max_category_repeats_per_round: 1   # unique bug class until the pool runs out
   shuffle_seeds: true                 # new seed order each round
+  recent_seed_rounds: 3               # do not redraw these completed rounds' seeds first
 
 resilience:
   max_judge_calls_per_submit: 1

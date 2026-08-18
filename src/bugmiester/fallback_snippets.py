@@ -285,6 +285,187 @@ func unique(_ items: [Item]) -> Set<Item> {
         hints=("Hashable",),
         keywords=("Hashable", "Set", "conform", "class"),
     ),
+    "send-task-mutate": MockSnippet(
+        code="""\
+final class Flag {
+    var on = false
+}
+func arm(_ flag: Flag) {
+    Task.detached { flag.on = true }
+}
+""",
+        bug_summary="Non-Sendable Flag is written from Task.detached",
+        bug_category="sendable",
+        difficulty="intermediate",
+        hints=("Flag is not Sendable",),
+        keywords=("Sendable", "Task", "detached", "class"),
+    ),
+    "send-actor-escape": MockSnippet(
+        code="""\
+class Token {
+    var n = 0
+}
+actor Gate {
+    func admit(_ token: Token) {}
+}
+func enter() async {
+    await Gate().admit(Token())
+}
+""",
+        bug_summary="Task-free async function still sends a non-Sendable Token into an actor",
+        bug_category="sendable",
+        difficulty="intermediate",
+        hints=("Token is not Sendable",),
+        keywords=("Sendable", "actor", "Token", "isolation"),
+    ),
+    "cod-key-mismatch": MockSnippet(
+        code="""\
+struct Team: Codable {
+    var name: String
+}
+func loadTeams(_ data: Data) throws -> Team {
+    try JSONDecoder().decode(Team.self, from: data)
+}
+""",
+        bug_summary="Decodes a JSON array of teams as a single Team object",
+        bug_category="codable",
+        difficulty="beginner",
+        hints=("decode [Team].self",),
+        keywords=("Codable", "array", "JSON", "decode"),
+    ),
+    "cod-date-strategy": MockSnippet(
+        code="""\
+struct Visit: Codable {
+    var arrived: Date
+}
+func visit(_ data: Data) throws -> Visit {
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .secondsSince1970
+    return try decoder.decode(Visit.self, from: data)
+}
+""",
+        bug_summary="Date strategy is seconds since 1970 but the JSON is milliseconds or ISO-8601",
+        bug_category="codable",
+        difficulty="intermediate",
+        hints=("dateDecodingStrategy does not match payload",),
+        keywords=("Date", "secondsSince1970", "JSONDecoder", "Codable"),
+    ),
+    "str-int-subscript": MockSnippet(
+        code="""\
+func second(_ text: String) -> Character {
+    return text[text.startIndex + 1]
+}
+""",
+        bug_summary="String.Index cannot be advanced with + 1; use index(_:offsetBy:)",
+        bug_category="string indexes",
+        difficulty="beginner",
+        hints=("index(_:offsetBy:)",),
+        keywords=("String", "Index", "offsetBy", "startIndex"),
+    ),
+    "str-offset-end": MockSnippet(
+        code="""\
+func afterEnd(_ text: String) -> String.Index {
+    text.index(after: text.endIndex)
+}
+""",
+        bug_summary="index(after:) on endIndex is past the string's valid range",
+        bug_category="string indexes",
+        difficulty="beginner",
+        hints=("endIndex is already past the last character",),
+        keywords=("endIndex", "index(after:)", "String", "bounds"),
+    ),
+    "lazy-let-struct": MockSnippet(
+        code="""\
+struct Cache {
+    lazy var n = 0
+}
+func show() {
+    let cache = Cache()
+    print(cache.n)
+}
+""",
+        bug_summary="lazy var n mutates Cache but cache is declared with let",
+        bug_category="lazy",
+        difficulty="intermediate",
+        hints=("cache must be var",),
+        keywords=("lazy", "let", "struct", "var"),
+    ),
+    "lazy-stale-total": MockSnippet(
+        code="""\
+struct Box {
+    var label = "a"
+    lazy var stamp = label.uppercased()
+}
+func retag(_ box: inout Box) -> String {
+    _ = box.stamp
+    box.label = "b"
+    return box.stamp
+}
+""",
+        bug_summary="lazy stamp keeps the first label and ignores later changes",
+        bug_category="lazy",
+        difficulty="intermediate",
+        hints=("lazy is cached",),
+        keywords=("lazy", "stale", "cached", "label"),
+    ),
+    "proto-wrong-name": MockSnippet(
+        code="""\
+protocol Named {
+    var name: String { get }
+}
+struct Person: Named {
+    var title: String
+}
+""",
+        bug_summary="Person claims Named but provides title instead of name",
+        bug_category="protocol witnesses",
+        difficulty="beginner",
+        hints=("Need var name",),
+        keywords=("protocol", "witness", "name", "property"),
+    ),
+    "proto-mutating-req": MockSnippet(
+        code="""\
+protocol Tick {
+    mutating func tick()
+}
+struct Clock: Tick {
+    var n = 0
+    func tick() { n += 1 }
+}
+""",
+        bug_summary="Clock.tick is not mutating so it cannot satisfy Tick.tick",
+        bug_category="protocol witnesses",
+        difficulty="intermediate",
+        hints=("mutating func tick",),
+        keywords=("mutating", "protocol", "tick", "struct"),
+    ),
+    "res-optional-result": MockSnippet(
+        code="""\
+func value(_ result: Result<Int, Error>) -> Int {
+    switch result {
+    case .success(let n):
+        return n
+    }
+}
+""",
+        bug_summary="Switch on Result is not exhaustive; failure is unhandled",
+        bug_category="result",
+        difficulty="beginner",
+        hints=("Handle .failure",),
+        keywords=("Result", "switch", "failure", "exhaustive"),
+    ),
+    "res-try-get": MockSnippet(
+        code="""\
+func value(_ result: Result<Int, Error>) -> Int {
+    result.get()
+}
+""",
+        bug_summary="Result.get() throws but the call site has no try",
+        bug_category="result",
+        difficulty="beginner",
+        hints=("Need try",),
+        keywords=("Result", "get", "try", "throws"),
+    ),
 }
 
 _DEFAULT_FALLBACK = MockSnippet(

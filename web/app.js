@@ -171,13 +171,34 @@
     setHidden(els.setupBanner, true);
   }
 
+  function escapeRegExp(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function stripRepeatedExpected(feedback, expected) {
+    const summary = (expected || "").trim();
+    let text = (feedback || "").trim();
+    if (!summary || !text) {
+      return text;
+    }
+    const exp = escapeRegExp(summary);
+    text = text.replace(new RegExp(`\\s*Expected:\\s*${exp}\\.?`, "gi"), "").trim();
+    text = text.replace(new RegExp(`(Yes)\\s*[—–-]\\s*${exp}\\.?`, "gi"), "$1.").trim();
+    const compact = (value) => value.replace(/\.+$/, "").trim().toLowerCase();
+    if (compact(text) === compact(summary)) {
+      return "";
+    }
+    return text;
+  }
+
   function showFeedback(result) {
-    els.feedbackText.textContent = result.feedback || "";
+    const expected = (result.expected_summary || "").trim();
     const hideExpected = Boolean(result.recovery_available);
+    els.feedbackText.textContent = hideExpected
+      ? result.feedback || ""
+      : stripRepeatedExpected(result.feedback || "", expected);
     els.expectedSummary.textContent =
-      !hideExpected && result.expected_summary
-        ? `Expected: ${result.expected_summary}`
-        : "";
+      !hideExpected && expected ? `Expected: ${expected}` : "";
     els.feedbackPanel.classList.remove(
       "alert-success",
       "alert-danger",

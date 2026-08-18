@@ -153,7 +153,7 @@ def test_order_seed_pool_shuffle_changes_order() -> None:
     assert {s.seed_id for s in shuffled} == {s.seed_id for s in SEED_POOL}
 
 
-def test_seed_pool_has_ten_categories_wired_to_mock_and_fallback() -> None:
+def test_seed_pool_has_sixteen_categories_wired_to_mock_and_fallback() -> None:
     from bugmiester.fallback_snippets import fallback_for_seed
     from bugmiester.llm.mock_provider import SEED_SNIPPETS
 
@@ -169,8 +169,15 @@ def test_seed_pool_has_ten_categories_wired_to_mock_and_fallback() -> None:
         "SwiftUI state",
         "captures",
         "equality",
+        "sendable",
+        "codable",
+        "string indexes",
+        "lazy",
+        "protocol witnesses",
+        "result",
     }
-    assert len(categories) == 10
+    assert len(categories) == 16
+    assert len(SEED_POOL) == 32
     for seed in SEED_POOL:
         assert seed.seed_id in SEED_SNIPPETS
         mock = SEED_SNIPPETS[seed.seed_id]
@@ -179,3 +186,19 @@ def test_seed_pool_has_ten_categories_wired_to_mock_and_fallback() -> None:
         assert fallback.bug_category == seed.category
         assert fallback.code != mock.code
         assert fallback.bug_summary != mock.bug_summary
+
+
+def test_order_seed_pool_puts_recent_seeds_last() -> None:
+    recent = [seed.seed_id for seed in SEED_POOL[:10]]
+    ordered = order_seed_pool(SEED_POOL, shuffle=False, recent_seed_ids=recent)
+    unused_ids = [seed.seed_id for seed in SEED_POOL[10:]]
+    assert [seed.seed_id for seed in ordered[: len(unused_ids)]] == unused_ids
+    assert [seed.seed_id for seed in ordered[len(unused_ids) :]] == recent
+
+    used: set[str] = set()
+    picked: list[str] = []
+    for _ in range(10):
+        seed = pick_seed(ordered, used, max_category_repeats=1)
+        used.add(seed.seed_id)
+        picked.append(seed.seed_id)
+    assert not set(picked) & set(recent)

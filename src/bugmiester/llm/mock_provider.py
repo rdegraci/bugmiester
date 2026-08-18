@@ -349,6 +349,186 @@ func sameName(_ a: Person, _ b: Person) -> Bool {
         hints=("Person is not Equatable",),
         keywords=("Equatable", "==", "class", "conform"),
     ),
+    "send-task-mutate": MockSnippet(
+        code="""\
+class Counter {
+    var n = 0
+}
+func bump(_ counter: Counter) {
+    Task { counter.n += 1 }
+}
+""",
+        bug_summary="Non-Sendable class is mutated from a concurrent Task",
+        bug_category="sendable",
+        difficulty="intermediate",
+        hints=("Counter is not Sendable",),
+        keywords=("Sendable", "Task", "isolation", "class"),
+    ),
+    "send-actor-escape": MockSnippet(
+        code="""\
+class Bag {
+    var items: [String] = []
+}
+actor Shelf {
+    func store(_ bag: Bag) {}
+}
+func park(_ shelf: Shelf, _ bag: Bag) async {
+    await shelf.store(bag)
+}
+""",
+        bug_summary="Non-Sendable class is passed into an actor method",
+        bug_category="sendable",
+        difficulty="intermediate",
+        hints=("Bag crosses isolation",),
+        keywords=("Sendable", "actor", "isolation", "class"),
+    ),
+    "cod-key-mismatch": MockSnippet(
+        code="""\
+struct User: Codable {
+    var fullName: String
+}
+func load(_ data: Data) throws -> User {
+    try JSONDecoder().decode(User.self, from: data)
+}
+""",
+        bug_summary="fullName expects a JSON key fullName; snake_case full_name will not decode",
+        bug_category="codable",
+        difficulty="beginner",
+        hints=("CodingKeys or convertFromSnakeCase",),
+        keywords=("Codable", "CodingKeys", "JSON", "key"),
+    ),
+    "cod-date-strategy": MockSnippet(
+        code="""\
+struct Event: Codable {
+    var when: Date
+}
+func read(_ data: Data) throws -> Event {
+    try JSONDecoder().decode(Event.self, from: data)
+}
+""",
+        bug_summary="JSONDecoder default Date strategy will not decode an ISO-8601 string",
+        bug_category="codable",
+        difficulty="intermediate",
+        hints=("dateDecodingStrategy",),
+        keywords=("Date", "JSONDecoder", "ISO-8601", "Codable"),
+    ),
+    "str-int-subscript": MockSnippet(
+        code="""\
+func firstChar(_ text: String) -> Character {
+    return text[0]
+}
+""",
+        bug_summary="String cannot be subscripted with Int; it needs a String.Index",
+        bug_category="string indexes",
+        difficulty="beginner",
+        hints=("String.Index not Int",),
+        keywords=("String", "Index", "subscript", "Int"),
+    ),
+    "str-offset-end": MockSnippet(
+        code="""\
+func third(_ text: String) -> Character {
+    let i = text.index(text.startIndex, offsetBy: 2)
+    return text[i]
+}
+""",
+        bug_summary="index(_:offsetBy: 2) traps when the string is shorter than 3 characters",
+        bug_category="string indexes",
+        difficulty="beginner",
+        hints=("Use limitedBy",),
+        keywords=("offsetBy", "endIndex", "String", "Index"),
+    ),
+    "lazy-let-struct": MockSnippet(
+        code="""\
+struct Loader {
+    lazy var data = expensive()
+}
+func read(_ loader: Loader) -> Int {
+    return loader.data
+}
+func expensive() -> Int { 1 }
+""",
+        bug_summary="Accessing lazy var mutates the struct, but loader is a let parameter",
+        bug_category="lazy",
+        difficulty="intermediate",
+        hints=("lazy var needs var",),
+        keywords=("lazy", "let", "struct", "mutate"),
+    ),
+    "lazy-stale-total": MockSnippet(
+        code="""\
+struct Stats {
+    var items: [Int]
+    lazy var total = items.reduce(0, +)
+}
+func bump(_ stats: inout Stats) -> Int {
+    _ = stats.total
+    stats.items = [9]
+    return stats.total
+}
+""",
+        bug_summary="lazy total is computed once and stays stale after items changes",
+        bug_category="lazy",
+        difficulty="intermediate",
+        hints=("lazy does not recompute",),
+        keywords=("lazy", "stale", "recompute", "total"),
+    ),
+    "proto-wrong-name": MockSnippet(
+        code="""\
+protocol Drawable {
+    func draw()
+}
+struct Dot: Drawable {
+    func render() {}
+}
+""",
+        bug_summary="Dot claims Drawable but implements render instead of draw",
+        bug_category="protocol witnesses",
+        difficulty="beginner",
+        hints=("Witness name must match",),
+        keywords=("protocol", "witness", "draw", "conform"),
+    ),
+    "proto-mutating-req": MockSnippet(
+        code="""\
+protocol Resettable {
+    mutating func reset()
+}
+struct Knob: Resettable {
+    var n = 1
+    func reset() { n = 0 }
+}
+""",
+        bug_summary="Non-mutating reset cannot witness a mutating protocol requirement",
+        bug_category="protocol witnesses",
+        difficulty="intermediate",
+        hints=("Need mutating func reset",),
+        keywords=("mutating", "protocol", "witness", "struct"),
+    ),
+    "res-optional-result": MockSnippet(
+        code="""\
+func label(_ result: Result<String, Error>) -> String {
+    if let text = result {
+        return text
+    }
+    return ""
+}
+""",
+        bug_summary="Result is not Optional; if-let will not unwrap success",
+        bug_category="result",
+        difficulty="beginner",
+        hints=("Switch on Result",),
+        keywords=("Result", "Optional", "if let", "success"),
+    ),
+    "res-try-get": MockSnippet(
+        code="""\
+func name(from result: Result<String, Error>) -> String {
+    try result.get()
+}
+""",
+        bug_summary="Result.get() throws but name(from:) is not marked throws",
+        bug_category="result",
+        difficulty="beginner",
+        hints=("Add throws or handle the error",),
+        keywords=("Result", "get", "throws", "try"),
+    ),
 }
 
 
@@ -492,14 +672,14 @@ class MockProvider:
             return JudgeResult(
                 correct=True,
                 partial=False,
-                feedback=f"Yes — {expected_summary}.",
+                feedback="Yes.",
                 confidence=0.95,
             )
         if tier == "weak":
             return JudgeResult(
                 correct=False,
                 partial=True,
-                feedback=f"Partially correct. Expected: {expected_summary}.",
+                feedback="Partially correct.",
                 confidence=0.55,
             )
         stripped = player_answer.strip()
@@ -513,7 +693,7 @@ class MockProvider:
         return JudgeResult(
             correct=False,
             partial=False,
-            feedback=f"Not quite. Expected: {expected_summary}.",
+            feedback="Not quite.",
             confidence=0.9,
         )
 

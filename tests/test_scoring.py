@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from bugmiester.app import create_app
 from bugmiester.config import ScoringSettings, ensure_app_dir, load_settings
-from bugmiester.llm.mock_provider import MockProvider
+from bugmiester.llm.mock_provider import MockProvider, SEED_SNIPPETS
 from bugmiester.scoring import (
     JudgeResult,
     score_answer,
@@ -33,7 +33,8 @@ def test_keyword_hit_full_credit() -> None:
     assert result.partial is False
     assert result.points_awarded == 10
     assert result.expected_summary == SUMMARY
-    assert "Yes" in result.feedback
+    assert result.feedback == "Yes."
+    assert SUMMARY not in result.feedback
 
 
 def test_keyword_miss_zero() -> None:
@@ -47,6 +48,8 @@ def test_keyword_miss_zero() -> None:
     assert result.partial is False
     assert result.points_awarded == 0
     assert result.expected_summary == SUMMARY
+    assert result.feedback == "Not quite."
+    assert "Expected:" not in result.feedback
 
 
 def test_keyword_partial_half_points() -> None:
@@ -61,6 +64,8 @@ def test_keyword_partial_half_points() -> None:
     assert result.partial is True
     assert result.points_awarded == 5
     assert result.expected_summary == SUMMARY
+    assert result.feedback == "Partially correct."
+    assert "Expected:" not in result.feedback
 
 
 def test_hybrid_accepts_strong_keyword_without_judge() -> None:
@@ -196,6 +201,13 @@ def _mock_settings(tmp_path: Path, monkeypatch):
     )
 
 
+def _answer_for_code(code: str) -> str:
+    for snip in SEED_SNIPPETS.values():
+        if snip.code.strip() == code.strip():
+            return " ".join(snip.keywords) + " " + snip.bug_summary
+    return "force unwrap optional nil"
+
+
 def test_mock_round_sensible_scores_and_expected_summary(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -219,10 +231,7 @@ def test_mock_round_sensible_scores_and_expected_summary(
             json={
                 "round_id": round_id,
                 "snippet_id": bug["snippet_id"],
-                "answer": (
-                    "force unwrap optional nil empty zero index count "
-                    "throws actor let mutate switch default await"
-                ),
+                "answer": _answer_for_code(bug["code"]),
             },
         ).json()
         if strong.get("recovery_available"):
@@ -247,7 +256,7 @@ def test_mock_round_sensible_scores_and_expected_summary(
             json={
                 "round_id": round_id,
                 "snippet_id": bug2["snippet_id"],
-                "answer": "completely unrelated retain cycle memory leak",
+                "answer": "css grid stylesheet overflow python gil deadlock",
             },
         ).json()
         assert miss["expected_summary"]

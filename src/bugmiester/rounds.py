@@ -43,6 +43,11 @@ from bugmiester.recovery import (
     strip_expected_from_feedback,
 )
 from bugmiester.reports import write_report
+from bugmiester.seed_memory import (
+    flatten_recent_seed_ids,
+    load_recent_rounds,
+    record_completed_round_seeds,
+)
 from bugmiester.scoring import score_answer
 
 _LIVE_PROVIDERS = frozenset({"openai", "anthropic", "grok"})
@@ -152,13 +157,20 @@ class RoundStore:
         round_id = str(uuid.uuid4())
         bugs = settings.game.bugs_per_round
         points = settings.scoring.points_per_bug
+        recent_ids: tuple[str, ...] = ()
+        if settings.freshness.recent_seed_rounds > 0:
+            recent_ids = tuple(
+                flatten_recent_seed_ids(load_recent_rounds(settings.app_dir))
+            )
         state = RoundState(
             round_id=round_id,
             bugs_per_round=bugs,
             points_per_bug=points,
             language=settings.game.language,
             seed_pool=order_seed_pool(
-                SEED_POOL, shuffle=settings.freshness.shuffle_seeds
+                SEED_POOL,
+                shuffle=settings.freshness.shuffle_seeds,
+                recent_seed_ids=recent_ids,
             ),
         )
         self._rounds[round_id] = state
@@ -447,11 +459,11 @@ class RoundStore:
             state.correct_count += 1
             if state.partial_count > 0:
                 state.partial_count -= 1
-            feedback = f"Yes — {stored.bug_summary}."
+            feedback = "Yes."
         elif picked:
-            feedback = f"Not quite. Expected: {stored.bug_summary}."
+            feedback = "Not quite."
         else:
-            feedback = f"Kept partial credit. Expected: {stored.bug_summary}."
+            feedback = "Kept partial credit."
 
         if settings.metrics.log_per_bug:
             self.metrics.record_recovery(
@@ -520,6 +532,17 @@ class RoundStore:
         if any(snip.recovery_open for snip in state.snippets.values()):
             return False
         state.complete = True
+        seed_ids = [
+            snip.seed_id
+            for snip in sorted(state.snippets.values(), key=lambda item: item.index)
+            if snip.seed_id
+        ]
+        record_completed_round_seeds(
+            settings.app_dir,
+            round_id=state.round_id,
+            seed_ids=seed_ids,
+            keep_rounds=settings.freshness.recent_seed_rounds,
+        )
         if settings.metrics.log_per_bug:
             self.metrics.flush_round(
                 settings.logs_dir,

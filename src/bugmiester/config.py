@@ -64,6 +64,7 @@ class FreshnessSettings:
     max_generate_attempts: int = 2
     max_category_repeats_per_round: int = 1
     shuffle_seeds: bool = True
+    recent_seed_rounds: int = 3
 
 
 @dataclass(frozen=True)
@@ -207,6 +208,12 @@ def _parse_yaml_config(raw: Mapping[str, Any]) -> dict[str, Any]:
                 default=1,
             ),
             shuffle_seeds=bool(freshness_raw.get("shuffle_seeds", True)),
+            recent_seed_rounds=_clamp_int(
+                freshness_raw.get("recent_seed_rounds", 3),
+                lo=0,
+                hi=10,
+                default=3,
+            ),
         ),
         "resilience": ResilienceSettings(
             max_judge_calls_per_submit=int(

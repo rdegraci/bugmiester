@@ -92,7 +92,7 @@ Player answer:
 Return ONLY valid JSON with these keys:
 - "correct": boolean (true only if the player clearly named the intended bug)
 - "partial": boolean (true for incomplete but on-track answers; false if correct)
-- "feedback": string (short feedback for the player)
+- "feedback": string (short verdict only, e.g. "Yes." / "Partially correct." / "Not quite." — do not repeat the expected bug summary)
 - "confidence": number from 0.0 to 1.0
 """
 

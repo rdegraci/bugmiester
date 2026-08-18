@@ -161,6 +161,7 @@ def test_load_settings_mock_always_ready(tmp_path: Path) -> None:
     assert settings.recovery.use_seed_bank_fallback is True
     assert settings.freshness.shuffle_seeds is True
     assert settings.freshness.max_category_repeats_per_round == 1
+    assert settings.freshness.recent_seed_rounds == 3
 
 
 def test_resolve_provider_key_helpers() -> None:

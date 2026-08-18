@@ -126,7 +126,7 @@ def score_keyword(
             partial=False,
             points_awarded=points_possible,
             points_possible=points_possible,
-            feedback=f"Yes — {expected_summary}.",
+            feedback="Yes.",
             expected_summary=expected_summary,
         )
     if tier == "weak" and partial_credit:
@@ -135,13 +135,13 @@ def score_keyword(
             partial=True,
             points_awarded=_half_points(points_possible),
             points_possible=points_possible,
-            feedback=f"Partially correct. Expected: {expected_summary}.",
+            feedback="Partially correct.",
             expected_summary=expected_summary,
         )
     if not _normalize(answer):
         feedback = "Empty answer."
     else:
-        feedback = f"Not quite. Expected: {expected_summary}."
+        feedback = "Not quite."
     return ScoreResult(
         correct=False,
         partial=False,
@@ -177,23 +177,21 @@ def _apply_generosity(
             result.feedback.strip()
             or "Close enough — we're giving partial credit."
         )
-        if expected_summary and expected_summary not in feedback:
-            feedback = f"{feedback} Expected: {expected_summary}."
 
     if correct:
-        return True, False, points_possible, feedback or f"Yes — {expected_summary}."
+        return True, False, points_possible, feedback or "Yes."
     if partial:
         return (
             False,
             True,
             _half_points(points_possible),
-            feedback or f"Partially correct. Expected: {expected_summary}.",
+            feedback or "Partially correct.",
         )
     return (
         False,
         False,
         0,
-        feedback or f"Not quite. Expected: {expected_summary}.",
+        feedback or "Not quite.",
     )
 
 
@@ -252,7 +250,7 @@ def score_answer(
                 partial=False,
                 points_awarded=0,
                 points_possible=points_possible,
-                feedback=f"Not quite. Expected: {expected_summary}.",
+                feedback="Not quite.",
                 expected_summary=expected_summary,
                 judge_called=False,
             )

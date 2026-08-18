@@ -27,7 +27,8 @@ class ScenarioSeed:
         return base
 
 
-# Curated pool — ten categories so a 10-bug round can skip class repeats.
+# Curated pool — 16 categories so a 10-bug round can skip class repeats
+# and later rounds still have unused classes.
 SEED_POOL: tuple[ScenarioSeed, ...] = (
     ScenarioSeed("opt-dict-force", "optionals", "dictionary lookup"),
     ScenarioSeed("col-empty-avg", "collections", "empty array average"),
@@ -49,6 +50,78 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
     ScenarioSeed("cap-timer-cycle", "captures", "repeating timer owned by self"),
     ScenarioSeed("eq-identity-id", "equality", "identity used instead of id equality"),
     ScenarioSeed("eq-missing-protocol", "equality", "class compared with == but not Equatable"),
+    ScenarioSeed(
+        "send-task-mutate",
+        "sendable",
+        "class mutated from Task",
+        "must involve Sendable or isolation; no force unwrap",
+    ),
+    ScenarioSeed(
+        "send-actor-escape",
+        "sendable",
+        "non-Sendable class passed into actor",
+        "must be a compile-logic isolation error",
+    ),
+    ScenarioSeed(
+        "cod-key-mismatch",
+        "codable",
+        "JSON key does not match property",
+        "must involve Codable keys; no force unwrap",
+    ),
+    ScenarioSeed(
+        "cod-date-strategy",
+        "codable",
+        "ISO-8601 date decoded with the default strategy",
+        "must fail at Date decode; no force unwrap",
+    ),
+    ScenarioSeed(
+        "str-int-subscript",
+        "string indexes",
+        "String subscripted with Int",
+        "must be a String.Index bug",
+    ),
+    ScenarioSeed(
+        "str-offset-end",
+        "string indexes",
+        "index offset past endIndex",
+        "must involve String.Index; no Int subscript",
+    ),
+    ScenarioSeed(
+        "lazy-let-struct",
+        "lazy",
+        "lazy var on a let struct",
+        "must involve lazy",
+    ),
+    ScenarioSeed(
+        "lazy-stale-total",
+        "lazy",
+        "lazy sum not recomputed after mutation",
+        "must involve lazy; not a retain cycle",
+    ),
+    ScenarioSeed(
+        "proto-wrong-name",
+        "protocol witnesses",
+        "type claims protocol but method name is wrong",
+        "must be a protocol witness mismatch",
+    ),
+    ScenarioSeed(
+        "proto-mutating-req",
+        "protocol witnesses",
+        "non-mutating witness for mutating requirement",
+        "must involve a protocol mutating requirement",
+    ),
+    ScenarioSeed(
+        "res-optional-result",
+        "result",
+        "Result treated as Optional",
+        "must involve Result; no try? on throws",
+    ),
+    ScenarioSeed(
+        "res-try-get",
+        "result",
+        "try used on Result.get without throws",
+        "must call Result.get",
+    ),
 )
 
 
@@ -160,12 +233,24 @@ def order_seed_pool(
     pool: Sequence[ScenarioSeed],
     *,
     shuffle: bool,
+    recent_seed_ids: Sequence[str] = (),
 ) -> tuple[ScenarioSeed, ...]:
-    """Copy of the seed pool, optionally shuffled for this round."""
-    items = list(pool)
+    """
+    Copy of the seed pool for this round.
+
+    Seeds not seen in ``recent_seed_ids`` come first. Recently used seeds follow,
+    oldest first, so a new round prefers unused settings. ``shuffle`` reorders
+    the unused group only.
+    """
+    recency: dict[str, int] = {}
+    for index, seed_id in enumerate(recent_seed_ids):
+        recency[seed_id] = index
+    unused = [seed for seed in pool if seed.seed_id not in recency]
+    used = [seed for seed in pool if seed.seed_id in recency]
+    used.sort(key=lambda seed: recency[seed.seed_id])
     if shuffle:
-        random.shuffle(items)
-    return tuple(items)
+        random.shuffle(unused)
+    return tuple(unused + used)
 
 
 def pick_seed(
