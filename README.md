@@ -155,6 +155,7 @@ Re-run when you change prompts or scoring. Expand the case file toward ~20–30 
 | [docs/cache/MVP-DEV.md](docs/cache/MVP-DEV.md) | APIs, layout, config, implementation order |
 | [docs/cache/MVP-BUILD_PROMPTS.md](docs/cache/MVP-BUILD_PROMPTS.md) | Cursor build slices for the MVP |
 | [docs/GOLDEN-EVAL.md](docs/GOLDEN-EVAL.md) | Offline golden scoring eval: what it does and how to run it |
+| [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) | Slice 16 MVP acceptance checklist (pass/fail) |
 
 ## Project layout
 

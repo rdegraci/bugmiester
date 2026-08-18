@@ -130,6 +130,7 @@
     const envPath = data.env_path || "";
     const parts = [
       data.message || `Set ${missing} in ${envPath}`,
+      data.app_dir ? `app_dir: ${data.app_dir}` : "",
       envPath ? `env_path: ${envPath}` : "",
       data.missing_key ? `missing_key: ${data.missing_key}` : "",
       data.config_path ? `config_path: ${data.config_path}` : "",

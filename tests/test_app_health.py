@@ -96,6 +96,9 @@ def test_serves_index_and_ops_and_vendor(tmp_path: Path, monkeypatch) -> None:
     assert css.status_code == 200
     assert css.headers["content-type"].startswith("text/css")
     assert js.status_code == 200
+    assert "showSetupFromHealth" in js.text
+    assert "app_dir" in js.text
+    assert "missing_key" in js.text
 
 
 def test_health_payload_shape() -> None:
