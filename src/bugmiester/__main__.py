@@ -1,29 +1,17 @@
-"""CLI entry: `python -m bugmiester`."""
+"""CLI entry: `python -m bugmiester` / `python -m bugmiester analyze`."""
 
 from __future__ import annotations
 
 import argparse
+import json
 
 import uvicorn
 
+from bugmiester.analyze import analyze
 from bugmiester.config import default_examples_dir, load_settings
 
 
-def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(prog="bugmiester", description="Bugmiester local server")
-    parser.add_argument(
-        "command",
-        nargs="?",
-        default="serve",
-        help="Command to run (default: serve). 'analyze' comes in a later slice.",
-    )
-    args = parser.parse_args(argv)
-
-    if args.command not in {"serve", "run"}:
-        raise SystemExit(
-            f"Unknown command {args.command!r}. Use: python -m bugmiester"
-        )
-
+def _cmd_serve() -> int:
     settings = load_settings(examples_dir=default_examples_dir())
     # Standing rule: localhost only.
     host = "127.0.0.1"
@@ -41,7 +29,51 @@ def main(argv: list[str] | None = None) -> None:
         port=port,
         reload=False,
     )
+    return 0
+
+
+def _cmd_analyze(*, pretty: bool = True) -> int:
+    settings = load_settings(examples_dir=default_examples_dir())
+    summary = analyze(
+        settings.reports_dir,
+        settings.logs_dir,
+        persist=True,
+    )
+    if pretty:
+        print(json.dumps(summary, indent=2, sort_keys=False))
+    else:
+        print(json.dumps(summary, sort_keys=False))
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="bugmiester",
+        description="Bugmiester local server and ops tools",
+    )
+    parser.add_argument(
+        "command",
+        nargs="?",
+        default="serve",
+        choices=("serve", "run", "analyze"),
+        help="Command to run (default: serve)",
+    )
+    parser.add_argument(
+        "--compact",
+        action="store_true",
+        help="With analyze: print compact JSON (one line)",
+    )
+    args = parser.parse_args(argv)
+
+    if args.command in {"serve", "run"}:
+        return _cmd_serve()
+
+    if args.command == "analyze":
+        return _cmd_analyze(pretty=not args.compact)
+
+    print(f"Unknown command {args.command!r}", flush=True)
+    return 2
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

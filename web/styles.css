@@ -108,3 +108,69 @@ a {
 a:hover {
   color: #ffb41a;
 }
+
+.ops-kpi {
+  background: var(--bm-panel);
+  border: 1px solid var(--bm-line);
+  border-radius: 0.5rem;
+  padding: 0.85rem 1rem;
+}
+
+.ops-kpi-label {
+  color: var(--bm-muted);
+  font-size: 0.8rem;
+  margin-bottom: 0.25rem;
+}
+
+.ops-kpi-value {
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.ops-table {
+  --bs-table-bg: var(--bm-panel);
+  --bs-table-color: var(--bm-ink);
+  --bs-table-border-color: var(--bm-line);
+  --bs-table-hover-bg: #1c2a38;
+  border: 1px solid var(--bm-line);
+}
+
+.ops-alert {
+  background: #2a2210;
+  border: 1px solid #5a4520;
+  border-radius: 0.35rem;
+  color: #f0d9a0;
+  margin-bottom: 0.5rem;
+  padding: 0.55rem 0.75rem;
+}
+
+.ops-detail {
+  background: var(--bm-panel);
+  border: 1px solid var(--bm-line);
+  border-radius: 0.5rem;
+  min-height: 12rem;
+  padding: 1rem;
+}
+
+.ops-detail-label {
+  color: var(--bm-muted);
+  font-size: 0.75rem;
+  margin-bottom: 0.15rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ops-detail-value {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ops-report-row {
+  cursor: pointer;
+}
+
+.ops-report-row:hover,
+.ops-report-selected {
+  background: #1c2a38 !important;
+}

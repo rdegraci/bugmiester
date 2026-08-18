@@ -6,12 +6,14 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from bugmiester.analyze import analyze, get_summary
 from bugmiester.config import Settings, default_examples_dir, load_settings
 from bugmiester.models import NextBugRequest, ReportSnippetRequest, SubmitRequest
+from bugmiester.reports import list_reports, load_report
 from bugmiester.rounds import RoundError, RoundStore
 
 
@@ -148,6 +150,52 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 status_code=exc.status_code,
                 detail={"message": exc.message, "code": exc.code},
             ) from exc
+
+    @app.get("/api/ops/summary")
+    def api_ops_summary() -> dict:
+        current = _current_settings(app)
+        return get_summary(
+            current.reports_dir,
+            current.logs_dir,
+            analyze_on_miss=True,
+            persist_on_miss=current.feedback.analyze_on_ops_load,
+        )
+
+    @app.post("/api/ops/analyze")
+    def api_ops_analyze() -> dict:
+        current = _current_settings(app)
+        return analyze(
+            current.reports_dir,
+            current.logs_dir,
+            persist=True,
+        )
+
+    @app.get("/api/ops/reports")
+    def api_ops_reports(
+        limit: int = Query(default=50, ge=1, le=500),
+        reason: str | None = Query(default=None),
+    ) -> list:
+        current = _current_settings(app)
+        try:
+            return list_reports(
+                current.reports_dir, limit=limit, reason=reason
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail={"message": str(exc), "code": "invalid_reason"},
+            ) from exc
+
+    @app.get("/api/ops/reports/{report_id}")
+    def api_ops_report_detail(report_id: str) -> dict:
+        current = _current_settings(app)
+        payload = load_report(current.reports_dir, report_id)
+        if payload is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"message": "Unknown report_id", "code": "unknown_report"},
+            )
+        return payload
 
     @app.get("/")
     def game_index() -> FileResponse:

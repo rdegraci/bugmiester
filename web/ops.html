@@ -14,26 +14,112 @@
           <p class="brand-mark mb-1">Bugmiester Ops</p>
           <p class="text-secondary mb-0">Local reports and round metrics.</p>
         </div>
-        <a class="btn btn-outline-secondary btn-sm" href="/">Back to game</a>
+        <div class="d-flex flex-wrap gap-2">
+          <button type="button" id="btn-analyze" class="btn btn-primary btn-sm">
+            Run analyze
+          </button>
+          <a class="btn btn-outline-secondary btn-sm" href="/">Back to game</a>
+        </div>
       </header>
 
-      <section class="mb-3">
-        <button type="button" id="btn-analyze" class="btn btn-primary btn-sm">
-          Run analyze
-        </button>
+      <p id="ops-status" class="text-secondary small" aria-live="polite"></p>
+
+      <section class="mb-4" aria-label="Key metrics">
+        <div class="row g-3" id="kpi-row">
+          <div class="col-6 col-md-3">
+            <div class="ops-kpi">
+              <div class="ops-kpi-label">Reports</div>
+              <div class="ops-kpi-value" id="kpi-reports">—</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="ops-kpi">
+              <div class="ops-kpi-label">Degraded</div>
+              <div class="ops-kpi-value" id="kpi-degraded">—</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="ops-kpi">
+              <div class="ops-kpi-label">Avg generate</div>
+              <div class="ops-kpi-value" id="kpi-generate">—</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="ops-kpi">
+              <div class="ops-kpi-label">Judge rate</div>
+              <div class="ops-kpi-value" id="kpi-judge">—</div>
+            </div>
+          </div>
+        </div>
       </section>
 
-      <section
-        id="ops-summary"
-        class="border rounded p-3"
-        style="border-color: var(--bm-line) !important; background: var(--bm-panel)"
-        aria-live="polite"
-      >
-        <p id="ops-summary-placeholder" class="text-secondary mb-0">
-          Summary will load here.
-        </p>
-        <pre id="ops-summary-body" class="code-well d-none mb-0" hidden></pre>
-      </section>
+      <div class="row g-4 mb-4">
+        <section class="col-lg-6" aria-label="Report reasons">
+          <h2 class="h6 text-secondary">Reasons</h2>
+          <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0 ops-table">
+              <thead>
+                <tr>
+                  <th scope="col">Reason</th>
+                  <th scope="col" class="text-end">Count</th>
+                </tr>
+              </thead>
+              <tbody id="reasons-body">
+                <tr>
+                  <td colspan="2" class="text-secondary">No data yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="col-lg-6" aria-label="Alerts">
+          <h2 class="h6 text-secondary">Alerts</h2>
+          <ul id="alerts-list" class="list-unstyled mb-0">
+            <li class="text-secondary">No alerts.</li>
+          </ul>
+        </section>
+      </div>
+
+      <div class="row g-4">
+        <section class="col-lg-6" aria-label="Recent reports">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+            <h2 class="h6 text-secondary mb-0">Recent reports</h2>
+            <label class="visually-hidden" for="filter-reason">Filter reason</label>
+            <select id="filter-reason" class="form-select form-select-sm report-reason">
+              <option value="">all reasons</option>
+              <option value="ambiguous">ambiguous</option>
+              <option value="does_not_compile">does_not_compile</option>
+              <option value="duplicate">duplicate</option>
+              <option value="unfair_score">unfair_score</option>
+              <option value="other">other</option>
+            </select>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-0 ops-table">
+              <thead>
+                <tr>
+                  <th scope="col">When</th>
+                  <th scope="col">Reason</th>
+                  <th scope="col">Category</th>
+                </tr>
+              </thead>
+              <tbody id="reports-body">
+                <tr>
+                  <td colspan="3" class="text-secondary">No reports yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="col-lg-6" aria-label="Report detail">
+          <h2 class="h6 text-secondary">Report detail</h2>
+          <div id="report-detail" class="ops-detail">
+            <p class="text-secondary mb-0">Select a report.</p>
+          </div>
+        </section>
+      </div>
     </main>
 
     <footer class="border-top py-3 mt-auto">
