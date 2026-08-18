@@ -73,6 +73,7 @@ def test_health_mock_ready(tmp_path: Path, monkeypatch) -> None:
     assert data["config_ready"] is True
     assert data["provider"] == "mock"
     assert data["missing_key"] is None
+    assert data["prefetch_next_bug"] is True
 
 
 def test_serves_index_and_ops_and_vendor(tmp_path: Path, monkeypatch) -> None:

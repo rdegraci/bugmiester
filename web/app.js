@@ -37,6 +37,15 @@
     roundComplete: false,
     configReady: false,
     reportedCurrent: false,
+    prefetchEnabled: true,
+    prefetch: {
+      token: 0,
+      roundId: null,
+      promise: null,
+      bug: null,
+      error: null,
+      inFlight: false,
+    },
   };
 
   function setHidden(el, hidden) {
@@ -56,6 +65,20 @@
 
   function bugsPerRound() {
     return Number(els.bugsPerRound.textContent) || 10;
+  }
+
+  function formatApiError(err) {
+    const msg = (err && err.message) || "Request failed";
+    const status = err && err.status;
+    if (status === 503) {
+      return msg.indexOf("503") >= 0 ? msg : `${msg} (503)`;
+    }
+    if (status === 502) {
+      return msg.indexOf("502") >= 0
+        ? msg
+        : `${msg} (502 — LLM request failed)`;
+    }
+    return msg;
   }
 
   function updateRoundChrome(data) {
@@ -81,6 +104,7 @@
     state.busy = busy;
     const answering =
       Boolean(state.snippetId) && !state.hasFeedback && !state.roundComplete;
+    // Prefetch runs in the background — do not lock Report / reading feedback.
     els.btnStart.disabled = busy;
     els.btnSubmit.disabled =
       busy || !answering || !els.answerInput.value.trim();
@@ -171,6 +195,22 @@
     }
   }
 
+  function invalidatePrefetch() {
+    state.prefetch.token += 1;
+    state.prefetch.promise = null;
+    state.prefetch.bug = null;
+    state.prefetch.error = null;
+    state.prefetch.inFlight = false;
+    state.prefetch.roundId = null;
+  }
+
+  function clearPrefetchResult() {
+    state.prefetch.bug = null;
+    state.prefetch.error = null;
+    state.prefetch.promise = null;
+    state.prefetch.inFlight = false;
+  }
+
   async function api(path, options) {
     const response = await fetch(path, {
       headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -197,18 +237,14 @@
     return data;
   }
 
-  async function fetchNextBug() {
+  function applyBug(bug) {
     const n = state.nextBugNumber;
-    setProgress(`Generating bug ${n}/${bugsPerRound()}…`);
-    const bug = await api("/api/round/next-bug", {
-      method: "POST",
-      body: JSON.stringify({ round_id: state.roundId }),
-    });
     state.snippetId = bug.snippet_id;
     state.hasFeedback = false;
     state.reportedCurrent = false;
     state.roundComplete = false;
-    state.nextBugNumber = (typeof bug.index === "number" ? bug.index : n - 1) + 2;
+    state.nextBugNumber =
+      (typeof bug.index === "number" ? bug.index : n - 1) + 2;
     updateRoundChrome(bug);
     setCode(bug.code || "");
     setDegraded(Boolean(bug.degraded));
@@ -218,9 +254,117 @@
     setBusy(false);
   }
 
+  async function requestNextBug(showProgress) {
+    const n = state.nextBugNumber;
+    if (showProgress) {
+      setProgress(`Generating bug ${n}/${bugsPerRound()}…`);
+    }
+    return api("/api/round/next-bug", {
+      method: "POST",
+      body: JSON.stringify({ round_id: state.roundId }),
+    });
+  }
+
+  function startPrefetch() {
+    if (
+      !state.prefetchEnabled ||
+      state.roundComplete ||
+      !state.roundId ||
+      state.prefetch.inFlight
+    ) {
+      return;
+    }
+    const token = state.prefetch.token + 1;
+    state.prefetch.token = token;
+    const roundId = state.roundId;
+    const n = state.nextBugNumber;
+    state.prefetch.roundId = roundId;
+    state.prefetch.bug = null;
+    state.prefetch.error = null;
+    state.prefetch.inFlight = true;
+    setProgress(`Preparing bug ${n}/${bugsPerRound()}…`);
+
+    const promise = requestNextBug(false)
+      .then((bug) => {
+        if (
+          token !== state.prefetch.token ||
+          roundId !== state.roundId ||
+          state.roundComplete
+        ) {
+          // Stale: a newer round started or round ended — ignore.
+          return null;
+        }
+        state.prefetch.bug = bug;
+        state.prefetch.inFlight = false;
+        if (state.hasFeedback && !state.busy) {
+          setProgress(`Bug ${n}/${bugsPerRound()} ready`);
+        }
+        return bug;
+      })
+      .catch((err) => {
+        if (token !== state.prefetch.token || roundId !== state.roundId) {
+          return null;
+        }
+        state.prefetch.error = err;
+        state.prefetch.inFlight = false;
+        if (state.hasFeedback && !state.busy) {
+          setProgress("");
+        }
+        return null;
+      });
+
+    state.prefetch.promise = promise;
+  }
+
+  async function fetchNextBug() {
+    const bug = await requestNextBug(true);
+    applyBug(bug);
+  }
+
+  async function takePrefetchedOrFetch() {
+    // Prefer a completed prefetch for this round (avoids double next-bug).
+    if (
+      state.prefetch.bug &&
+      state.prefetch.roundId === state.roundId &&
+      !state.roundComplete
+    ) {
+      const bug = state.prefetch.bug;
+      clearPrefetchResult();
+      applyBug(bug);
+      return;
+    }
+
+    // Await in-flight prefetch for this round instead of issuing a second call.
+    if (
+      state.prefetch.promise &&
+      state.prefetch.roundId === state.roundId &&
+      !state.roundComplete
+    ) {
+      setProgress(
+        `Generating bug ${state.nextBugNumber}/${bugsPerRound()}…`
+      );
+      await state.prefetch.promise;
+      if (
+        state.prefetch.bug &&
+        state.prefetch.roundId === state.roundId &&
+        !state.roundComplete
+      ) {
+        const bug = state.prefetch.bug;
+        clearPrefetchResult();
+        applyBug(bug);
+        return;
+      }
+      // Prefetch failed or was cancelled — fall through to a fresh request.
+      clearPrefetchResult();
+    }
+
+    await fetchNextBug();
+  }
+
   async function onStart() {
     if (state.busy) return;
     setBusy(true);
+    invalidatePrefetch();
     clearFeedback();
     setDegraded(false);
     state.snippetId = null;
@@ -238,8 +382,8 @@
       await fetchNextBug();
     } catch (err) {
       setProgress("");
-      setCode("Could not start round.");
-      showSetupBanner(err.message || "Failed to start round");
+      setCode(formatApiError(err) || "Could not start round.");
+      showSetupBanner(formatApiError(err) || "Failed to start round");
       setBusy(false);
     }
   }
@@ -268,15 +412,18 @@
       setProgress("");
       setBusy(false);
       if (result.round_complete) {
+        invalidatePrefetch();
         showRoundCompleteModal(result);
         els.btnNext.disabled = true;
+      } else if (state.prefetchEnabled) {
+        startPrefetch();
       }
     } catch (err) {
       setProgress("");
       showFeedback({
         correct: false,
         partial: false,
-        feedback: err.message || "Submit failed",
+        feedback: formatApiError(err) || "Submit failed",
         expected_summary: "",
       });
       setBusy(false);
@@ -294,10 +441,11 @@
     }
     setBusy(true);
     try {
-      await fetchNextBug();
+      await takePrefetchedOrFetch();
     } catch (err) {
+      clearPrefetchResult();
       setProgress("");
-      setCode(err.message || "Could not load next bug.");
+      setCode(formatApiError(err) || "Could not load next bug.");
       setBusy(false);
     }
   }
@@ -313,6 +461,8 @@
       return;
     }
     const reason = (els.reportReason && els.reportReason.value) || "other";
+    // Keep current snippet_id for report even if prefetch already advanced server pending.
+    const snippetId = state.snippetId;
     setBusy(true);
     setProgress("Sending report…");
     try {
@@ -320,7 +470,7 @@
         method: "POST",
         body: JSON.stringify({
           round_id: state.roundId,
-          snippet_id: state.snippetId,
+          snippet_id: snippetId,
           reason,
           note: "",
         }),
@@ -328,8 +478,18 @@
       state.reportedCurrent = true;
       setProgress("Report saved.");
       setBusy(false);
+      // Restore soft prefetch status if a next bug is already ready.
+      if (state.prefetch.bug && !state.roundComplete) {
+        setProgress(
+          `Bug ${state.nextBugNumber}/${bugsPerRound()} ready`
+        );
+      } else if (state.prefetch.inFlight && !state.roundComplete) {
+        setProgress(
+          `Preparing bug ${state.nextBugNumber}/${bugsPerRound()}…`
+        );
+      }
     } catch (err) {
-      setProgress(err.message || "Report failed");
+      setProgress(formatApiError(err) || "Report failed");
       setBusy(false);
     }
   }
@@ -358,6 +518,9 @@
       if (!response.ok) return;
       const data = await response.json();
       state.configReady = Boolean(data.config_ready);
+      if (typeof data.prefetch_next_bug === "boolean") {
+        state.prefetchEnabled = data.prefetch_next_bug;
+      }
       if (data && data.config_ready === false) {
         showSetupFromHealth(data);
       } else {

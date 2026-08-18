@@ -39,6 +39,7 @@ def health_payload(settings: Settings) -> dict:
         "config_path": str(settings.config_path),
         "missing_key": settings.missing_key,
         "message": message,
+        "prefetch_next_bug": bool(settings.resilience.prefetch_next_bug),
     }
 
 
