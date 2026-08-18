@@ -81,7 +81,7 @@ def test_attempt_cap_surfaces_degraded_fallback() -> None:
         return duplicate
 
     used: set[str] = set()
-    result, degraded, attempts, rejects = generate_with_freshness(
+    result, degraded, attempts, rejects, parse_failures = generate_with_freshness(
         used_seed_ids=used,
         history=history,
         seed_pool=(seed,),
@@ -96,6 +96,7 @@ def test_attempt_cap_surfaces_degraded_fallback() -> None:
     assert degraded is True
     assert attempts == 2
     assert rejects == 2
+    assert parse_failures == 0
     assert result.code != duplicate.code
     assert "as!" in result.code or "first" in result.code or "max" in result.code
     assert seed.seed_id in used
@@ -106,7 +107,7 @@ def test_fresh_generate_accepts_unique_mock(monkeypatch) -> None:
 
     provider = MockProvider()
     used: set[str] = set()
-    result, degraded, attempts, rejects = generate_with_freshness(
+    result, degraded, attempts, rejects, parse_failures = generate_with_freshness(
         used_seed_ids=used,
         history=[],
         max_attempts=2,
@@ -117,5 +118,6 @@ def test_fresh_generate_accepts_unique_mock(monkeypatch) -> None:
     assert degraded is False
     assert attempts == 1
     assert rejects == 0
+    assert parse_failures == 0
     assert result.code
     assert result.seed.seed_id in used

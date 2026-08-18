@@ -8,15 +8,8 @@ from collections import deque
 from dataclasses import dataclass, field
 
 from bugmiester.config import Settings
-from bugmiester.fallback_snippets import fallback_for_seed
-from bugmiester.freshness import (
-    SEED_POOL,
-    GeneratedSnippet,
-    HistoryEntry,
-    generate_with_freshness,
-    history_entry,
-)
-from bugmiester.llm.mock_provider import MockProvider
+from bugmiester.freshness import GeneratedSnippet, HistoryEntry, history_entry
+from bugmiester.llm import generate_bug, judge_answer
 from bugmiester.metrics import MetricsCollector
 from bugmiester.models import (
     NextBugResponse,
@@ -74,7 +67,6 @@ class RoundState:
 class RoundStore:
     def __init__(self, history_maxlen: int = 200) -> None:
         self._rounds: dict[str, RoundState] = {}
-        self._mock = MockProvider()
         self._history: deque[HistoryEntry] = deque(maxlen=history_maxlen)
         self.metrics = MetricsCollector()
 
@@ -122,6 +114,7 @@ class RoundStore:
 
         provider = settings.llm.provider
         if provider != "mock":
+            # Facade also stubs live providers; keep an early clear error for rounds.
             raise RoundError(
                 "provider_unsupported",
                 f"Provider '{provider}' is not wired yet. Set llm.provider to mock.",
@@ -129,18 +122,16 @@ class RoundStore:
             )
 
         started = time.perf_counter()
-        generated, degraded, attempts, rejects = generate_with_freshness(
+        outcome = generate_bug(
+            settings,
             used_seed_ids=state.used_seed_ids,
             history=list(self._history),
-            seed_pool=SEED_POOL,
-            max_attempts=settings.freshness.max_generate_attempts,
-            similarity_threshold=settings.freshness.similarity_reject_threshold,
-            avoid_list_max=settings.freshness.avoid_list_max,
-            use_fallback=settings.resilience.use_canned_fallback_on_generate_exhaustion,
-            generate_fn=self._mock.generate_for_seed,
-            fallback_fn=fallback_for_seed,
         )
         generate_ms = (time.perf_counter() - started) * 1000.0
+        generated = outcome.as_generated_snippet()
+        degraded = outcome.degraded
+        attempts = outcome.attempts
+        rejects = outcome.freshness_rejects
 
         stored = self._store_generated(
             state,
@@ -234,8 +225,11 @@ class RoundStore:
 
         judge_fn = None
         if settings.llm.provider == "mock":
-            judge_fn = self._mock.judge_answer
-        # Live providers: judge_answer wired in later provider slices.
+
+            def _judge(code: str, expected: str, ans: str):
+                return judge_answer(code, expected, ans, settings)
+
+            judge_fn = _judge
 
         started = time.perf_counter()
         scored = score_answer(

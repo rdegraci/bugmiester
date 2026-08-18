@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import json
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
+from bugmiester.config import Settings
 from bugmiester.freshness import GeneratedSnippet, HistoryEntry, ScenarioSeed
-from bugmiester.scoring import JudgeResult, keyword_match_tier
+from bugmiester.llm.base import JudgeResult
+from bugmiester.scoring import keyword_match_tier
 
 
 @dataclass(frozen=True)
@@ -17,6 +21,20 @@ class MockSnippet:
     difficulty: str
     hints: tuple[str, ...] = field(default_factory=tuple)
     keywords: tuple[str, ...] = field(default_factory=tuple)
+
+    def to_generation_json(self) -> str:
+        return json.dumps(
+            {
+                "code": self.code,
+                "bug_summary": self.bug_summary,
+                "bug_category": self.bug_category,
+                "difficulty": self.difficulty,
+                "hints": list(self.hints),
+                "keywords": list(self.keywords),
+            },
+            ensure_ascii=False,
+        )
+
 
 
 # Ten distinct one-bug Swift snippets for a full mock round.
@@ -212,18 +230,18 @@ class MockProvider:
         self,
         snippets: tuple[MockSnippet, ...] = MOCK_SNIPPETS,
         seed_map: dict[str, MockSnippet] | None = None,
+        *,
+        invalid_raw_queue: Sequence[str] | None = None,
     ) -> None:
         if not snippets:
             raise ValueError("MockProvider requires at least one snippet")
         self._snippets = snippets
         self._seed_map = seed_map if seed_map is not None else dict(SEED_SNIPPETS)
         self._cursor = 0
+        # Optional queue of raw strings returned before normal fixtures (tests).
+        self._invalid_raw_queue = list(invalid_raw_queue or [])
 
-    def generate_for_seed(
-        self,
-        seed: ScenarioSeed,
-        _avoid: Sequence[HistoryEntry] | None = None,
-    ) -> GeneratedSnippet:
+    def _resolve_snippet(self, seed: ScenarioSeed) -> MockSnippet:
         snip = self._seed_map.get(seed.seed_id)
         if snip is None:
             snip = next(
@@ -231,6 +249,14 @@ class MockProvider:
                 self._snippets[self._cursor % len(self._snippets)],
             )
             self._cursor += 1
+        return snip
+
+    def generate_for_seed(
+        self,
+        seed: ScenarioSeed,
+        _avoid: Sequence[HistoryEntry] | None = None,
+    ) -> GeneratedSnippet:
+        snip = self._resolve_snippet(seed)
         return GeneratedSnippet(
             code=snip.code,
             bug_summary=snip.bug_summary,
@@ -241,6 +267,31 @@ class MockProvider:
             seed=seed,
         )
 
+    def generate_raw(
+        self,
+        prompt: str,
+        settings: Settings | None = None,
+        *,
+        seed: ScenarioSeed | None = None,
+    ) -> str:
+        """Return generation JSON text (optionally drained from a test fault queue)."""
+        del settings  # mock ignores model/temperature
+        if self._invalid_raw_queue:
+            return self._invalid_raw_queue.pop(0)
+        if seed is None:
+            seed = self._seed_from_prompt(prompt)
+        return self._resolve_snippet(seed).to_generation_json()
+
+    def _seed_from_prompt(self, prompt: str) -> ScenarioSeed:
+        match = re.search(r"seed_id:\s*([a-z0-9\-]+)", prompt)
+        if match:
+            seed_id = match.group(1)
+            for sid, snip in self._seed_map.items():
+                if sid == seed_id:
+                    return ScenarioSeed(sid, snip.bug_category, sid)
+            return ScenarioSeed(seed_id, "optionals", seed_id)
+        return ScenarioSeed("opt-dict-force", "optionals", "dictionary lookup")
+
     def next_snippet(self, round_index: int) -> MockSnippet:
         """Legacy index rotation (prefer generate_for_seed)."""
         if round_index < len(self._snippets):
@@ -248,6 +299,38 @@ class MockProvider:
         snippet = self._snippets[self._cursor % len(self._snippets)]
         self._cursor += 1
         return snippet
+
+    def judge_raw(self, prompt: str, settings: Settings | None = None) -> str:
+        """Return judge JSON text for facade parse."""
+        del settings
+        # Pull fields back out of the shared judge prompt shape.
+        code = ""
+        expected = ""
+        answer = ""
+        code_match = re.search(
+            r"Swift code:\n```\n([\s\S]*?)\n```", prompt
+        )
+        if code_match:
+            code = code_match.group(1)
+        expected_match = re.search(
+            r"Expected bug summary:\n([\s\S]*?)\n\nPlayer answer:", prompt
+        )
+        if expected_match:
+            expected = expected_match.group(1).strip()
+        answer_match = re.search(
+            r"Player answer:\n([\s\S]*?)\n\nReturn ONLY valid JSON", prompt
+        )
+        if answer_match:
+            answer = answer_match.group(1).strip()
+        judged = self.judge_answer(code, expected, answer)
+        return json.dumps(
+            {
+                "correct": judged.correct,
+                "partial": judged.partial,
+                "feedback": judged.feedback,
+                "confidence": judged.confidence,
+            }
+        )
 
     def judge_answer(
         self,
@@ -259,10 +342,9 @@ class MockProvider:
         Deterministic mock judge (no network).
 
         Uses the same keyword tiering as the scorer so hybrid/llm_judge modes
-        stay exercisable without a live provider. Live LLM judging is Slice 10+.
+        stay exercisable without a live provider.
         """
         del code  # available for future richer fixtures
-        # Prefer keywords from a matching canned snippet when present.
         keywords: tuple[str, ...] = ()
         for snip in self._snippets:
             if snip.bug_summary == expected_summary:
@@ -291,7 +373,6 @@ class MockProvider:
                 feedback=f"Partially correct. Expected: {expected_summary}.",
                 confidence=0.55,
             )
-        # Ambiguous / empty answers get low confidence so generosity can soften.
         stripped = player_answer.strip()
         if len(stripped) < 8:
             return JudgeResult(
@@ -306,3 +387,4 @@ class MockProvider:
             feedback=f"Not quite. Expected: {expected_summary}.",
             confidence=0.9,
         )
+

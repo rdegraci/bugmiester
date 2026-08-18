@@ -7,6 +7,8 @@ import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
+from bugmiester.llm.parse import ParseError
+
 
 @dataclass(frozen=True)
 class ScenarioSeed:
@@ -158,6 +160,7 @@ def pick_seed(
 
 
 GenerateFn = Callable[[ScenarioSeed, Sequence[HistoryEntry]], GeneratedSnippet]
+RawGenerateFn = Callable[[ScenarioSeed, Sequence[HistoryEntry]], str]
 FallbackFn = Callable[[ScenarioSeed], GeneratedSnippet]
 
 
@@ -170,25 +173,49 @@ def generate_with_freshness(
     similarity_threshold: float = 0.72,
     avoid_list_max: int = 20,
     use_fallback: bool = True,
-    generate_fn: GenerateFn,
+    generate_fn: GenerateFn | None = None,
+    generate_raw_fn: RawGenerateFn | None = None,
     fallback_fn: FallbackFn,
-) -> tuple[GeneratedSnippet, bool, int, int]:
+    parse_raw: Callable[[str], GeneratedSnippet] | None = None,
+) -> tuple[GeneratedSnippet, bool, int, int, int]:
     """
-    Pick a seed, generate with retries on near-duplicates, else fallback.
+    Pick a seed, generate with retries on parse failure / near-duplicates, else fallback.
 
-    Returns (snippet, degraded, attempts_used, freshness_rejects).
+    JSON parse failures and freshness rejects **share** ``max_attempts``.
+
+    Returns
+    -------
+    (snippet, degraded, attempts_used, freshness_rejects, parse_failures)
     """
+    if generate_fn is None and generate_raw_fn is None:
+        raise ValueError("Provide generate_fn or generate_raw_fn")
+    if generate_raw_fn is not None and parse_raw is None:
+        raise ValueError("parse_raw is required when using generate_raw_fn")
+
     seed = pick_seed(seed_pool, used_seed_ids)
     used_seed_ids.add(seed.seed_id)
     avoid = build_avoid_list(history, max_items=avoid_list_max)
 
     attempts = 0
     rejects = 0
+    parse_failures = 0
     last: GeneratedSnippet | None = None
 
     while attempts < max_attempts:
         attempts += 1
-        candidate = generate_fn(seed, avoid)
+        candidate: GeneratedSnippet | None = None
+        if generate_raw_fn is not None:
+            assert parse_raw is not None
+            raw = generate_raw_fn(seed, avoid)
+            try:
+                candidate = parse_raw(raw)
+            except ParseError:
+                parse_failures += 1
+                continue
+        else:
+            assert generate_fn is not None
+            candidate = generate_fn(seed, avoid)
+
         last = candidate
         if not is_too_similar(
             candidate.code,
@@ -196,7 +223,7 @@ def generate_with_freshness(
             avoid,
             similarity_threshold,
         ):
-            return candidate, False, attempts, rejects
+            return candidate, False, attempts, rejects, parse_failures
         rejects += 1
         # Stricter avoid-list for next attempt: include rejected summary as synthetic entry.
         avoid = list(avoid) + [
@@ -210,9 +237,9 @@ def generate_with_freshness(
 
     if use_fallback:
         fallback = fallback_fn(seed)
-        return fallback, True, attempts, rejects
+        return fallback, True, attempts, rejects, parse_failures
 
     if last is not None:
         # Last resort without fallback flag: return last attempt undegraded.
-        return last, False, attempts, rejects
+        return last, False, attempts, rejects, parse_failures
     raise RuntimeError("generate_with_freshness produced no candidate")

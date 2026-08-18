@@ -7,21 +7,22 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from bugmiester.config import ScoringSettings
+from bugmiester.llm.base import JudgeResult as JudgeResult
 
 # Confidence at or below this is "low" for generosity.
 LOW_CONFIDENCE_THRESHOLD = 0.5
 
-JudgeFn = Callable[[str, str, str], "JudgeResult"]
+# Re-export for call sites / tests that import from scoring.
+__all__ = [
+    "JudgeResult",
+    "ScoreResult",
+    "keyword_match_tier",
+    "score_answer",
+    "score_keyword",
+    "simple_keyword_score",
+]
 
-
-@dataclass(frozen=True)
-class JudgeResult:
-    """Result of a single judge_answer call."""
-
-    correct: bool
-    partial: bool
-    feedback: str
-    confidence: float = 1.0
+JudgeFn = Callable[[str, str, str], JudgeResult]
 
 
 @dataclass(frozen=True)
