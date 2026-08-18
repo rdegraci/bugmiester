@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from bugmiester.config import Settings
 from bugmiester.freshness import GeneratedSnippet, HistoryEntry, history_entry
 from bugmiester.llm import generate_bug, judge_answer
+from bugmiester.llm.openai_provider import OpenAIConfigError, OpenAIRequestError
 from bugmiester.metrics import MetricsCollector
 from bugmiester.models import (
     NextBugResponse,
@@ -20,6 +21,36 @@ from bugmiester.models import (
 )
 from bugmiester.reports import write_report
 from bugmiester.scoring import score_answer
+
+
+def _assert_provider_ready(settings: Settings) -> None:
+    provider = (settings.llm.provider or "").strip().lower()
+    if provider == "mock":
+        return
+    if provider == "openai":
+        if not settings.config_ready:
+            raise RoundError(
+                "config_not_ready",
+                f"Set OPENAI_API_KEY in {settings.env_path}",
+                status_code=503,
+            )
+        return
+    raise RoundError(
+        "provider_unsupported",
+        f"Provider '{provider}' is not wired yet. Set llm.provider to mock or openai.",
+        status_code=503,
+    )
+
+
+def _judge_fn_for(settings: Settings):
+    provider = (settings.llm.provider or "").strip().lower()
+    if provider in {"mock", "openai"}:
+
+        def _judge(code: str, expected: str, ans: str):
+            return judge_answer(code, expected, ans, settings)
+
+        return _judge
+    return None
 
 
 @dataclass
@@ -112,21 +143,33 @@ class RoundStore:
         if state.index >= state.bugs_per_round:
             raise RoundError("round_complete", "No more bugs in this round")
 
-        provider = settings.llm.provider
-        if provider != "mock":
-            # Facade also stubs live providers; keep an early clear error for rounds.
-            raise RoundError(
-                "provider_unsupported",
-                f"Provider '{provider}' is not wired yet. Set llm.provider to mock.",
-                status_code=503,
-            )
+        _assert_provider_ready(settings)
 
         started = time.perf_counter()
-        outcome = generate_bug(
-            settings,
-            used_seed_ids=state.used_seed_ids,
-            history=list(self._history),
-        )
+        try:
+            outcome = generate_bug(
+                settings,
+                used_seed_ids=state.used_seed_ids,
+                history=list(self._history),
+            )
+        except OpenAIConfigError as exc:
+            raise RoundError(
+                "config_not_ready",
+                str(exc),
+                status_code=503,
+            ) from exc
+        except OpenAIRequestError as exc:
+            raise RoundError(
+                "llm_failed",
+                str(exc),
+                status_code=502,
+            ) from exc
+        except NotImplementedError as exc:
+            raise RoundError(
+                "provider_unsupported",
+                str(exc),
+                status_code=503,
+            ) from exc
         generate_ms = (time.perf_counter() - started) * 1000.0
         generated = outcome.as_generated_snippet()
         degraded = outcome.degraded
@@ -223,25 +266,38 @@ class RoundStore:
                 "This snippet is not the active pending bug",
             )
 
-        judge_fn = None
-        if settings.llm.provider == "mock":
-
-            def _judge(code: str, expected: str, ans: str):
-                return judge_answer(code, expected, ans, settings)
-
-            judge_fn = _judge
+        judge_fn = _judge_fn_for(settings)
 
         started = time.perf_counter()
-        scored = score_answer(
-            code=stored.code,
-            expected_summary=stored.bug_summary,
-            answer=answer,
-            keywords=stored.keywords,
-            bug_category=stored.bug_category,
-            scoring=settings.scoring,
-            max_judge_calls=settings.resilience.max_judge_calls_per_submit,
-            judge_fn=judge_fn,
-        )
+        try:
+            scored = score_answer(
+                code=stored.code,
+                expected_summary=stored.bug_summary,
+                answer=answer,
+                keywords=stored.keywords,
+                bug_category=stored.bug_category,
+                scoring=settings.scoring,
+                max_judge_calls=settings.resilience.max_judge_calls_per_submit,
+                judge_fn=judge_fn,
+            )
+        except OpenAIConfigError as exc:
+            raise RoundError(
+                "config_not_ready",
+                str(exc),
+                status_code=503,
+            ) from exc
+        except OpenAIRequestError as exc:
+            raise RoundError(
+                "llm_failed",
+                str(exc),
+                status_code=502,
+            ) from exc
+        except NotImplementedError as exc:
+            raise RoundError(
+                "provider_unsupported",
+                str(exc),
+                status_code=503,
+            ) from exc
         submit_ms = (time.perf_counter() - started) * 1000.0
 
         stored.answered = True

@@ -86,7 +86,7 @@ def test_full_mock_round_no_answer_key_leak(tmp_path: Path, monkeypatch) -> None
         assert blocked.status_code == 400
 
 
-def test_next_bug_rejects_non_mock(tmp_path: Path, monkeypatch) -> None:
+def test_next_bug_rejects_openai_without_key(tmp_path: Path, monkeypatch) -> None:
     settings = _mock_settings(tmp_path, monkeypatch)
     # Flip provider to openai with placeholder after settings object created —
     # reload from disk instead.
@@ -106,3 +106,4 @@ def test_next_bug_rejects_non_mock(tmp_path: Path, monkeypatch) -> None:
         round_id = client.post("/api/round/start").json()["round_id"]
         response = client.post("/api/round/next-bug", json={"round_id": round_id})
         assert response.status_code == 503
+        assert "OPENAI_API_KEY" in response.json()["detail"]["message"]

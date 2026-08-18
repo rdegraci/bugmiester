@@ -221,11 +221,19 @@ def test_facade_mock_round_still_works(tmp_path: Path, monkeypatch) -> None:
         assert result["points_possible"] == 10
 
 
-def test_live_providers_stubbed(tmp_path: Path, monkeypatch) -> None:
+def test_live_providers_stubbed_except_openai(tmp_path: Path, monkeypatch) -> None:
     from dataclasses import replace
 
     settings = _mock_settings(tmp_path, monkeypatch)
-    for name in ("openai", "anthropic", "grok"):
+    for name in ("anthropic", "grok"):
         live = replace(settings, llm=replace(settings.llm, provider=name))
         with pytest.raises(NotImplementedError):
             generate_bug(live, used_seed_ids=set(), history=[])
+
+    # OpenAI is wired; without a usable key it fails with a clear config error
+    # before any network call (covered in test_openai_provider.py).
+    openai_settings = replace(settings, llm=replace(settings.llm, provider="openai"))
+    from bugmiester.llm.openai_provider import OpenAIConfigError
+
+    with pytest.raises(OpenAIConfigError):
+        generate_bug(openai_settings, used_seed_ids=set(), history=[])
