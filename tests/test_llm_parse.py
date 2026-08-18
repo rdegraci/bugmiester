@@ -63,7 +63,10 @@ def test_prompts_include_seed_and_avoid_list() -> None:
     seed = SEED_POOL[0]
     avoid = []
     prompt = build_generation_prompt(seed, avoid)
-    assert "Exactly ONE intentional bug" in prompt
+    assert "exactly ONE intentional bug" in prompt
+    assert "correct" in prompt and "language feature" in prompt
+    assert "Do not return the correct snippet" in prompt
+    assert "Not a tutorial" in prompt
     assert "failure mode" in prompt
     assert seed.seed_id in prompt
     assert "bug_summary" in prompt

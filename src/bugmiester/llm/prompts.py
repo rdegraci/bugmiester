@@ -39,17 +39,25 @@ def build_generation_prompt(
     Prompt for one-bug Swift snippet JSON.
 
     Contract keys: code, bug_summary, bug_category, difficulty, hints.
+    The model should invent a correct use of the seed feature, then break it
+    once; only the broken snippet is returned.
     """
     avoid = _format_avoid_list(avoid_list)
     return f"""You write short {language} code puzzles for a bug-spotting game.
 
-Task: Write a NEW {language} snippet for this scenario seed:
+Scenario seed:
 {format_scenario_seed(seed)}
 
+Work in this order. Do not put the correct version in the JSON:
+1. Mentally write a short, correct {language} example that uses this seed's language feature (category and setting).
+2. Introduce exactly ONE intentional bug of that seed's class (correctness / runtime / compile-logic — not style).
+3. Return only the broken snippet.
+
 Rules:
-- Exactly ONE intentional bug (correctness / runtime / compile-logic — not style).
 - The bug must fit this seed's category. Do not substitute a generic force-unwrap or missing await unless the category requires it.
 - No multiple interacting defects.
+- The JSON "code" must contain the bug. Do not return the correct snippet.
+- "bug_summary" is one short sentence that names the defect. Not a tutorial. Not the fix.
 - Short enough to read on one screen.
 - Do NOT reuse or near-duplicate anything on the avoid-list.
 - Do not reuse an avoid-list failure mode (for example a second force-unwrap, a second missing await, or a second empty-array crash).
