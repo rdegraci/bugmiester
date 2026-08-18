@@ -217,7 +217,11 @@ def test_facade_mock_round_still_works(tmp_path: Path, monkeypatch) -> None:
                 "answer": "force unwrap optional nil dictionary",
             },
         ).json()
-        assert result["expected_summary"]
+        if result.get("recovery_available"):
+            assert result["expected_summary"] == ""
+            assert result["recovery_options"]
+        else:
+            assert result["expected_summary"]
         assert result["points_possible"] == 10
 
 

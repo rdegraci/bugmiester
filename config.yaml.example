@@ -32,6 +32,13 @@ resilience:
   use_canned_fallback_on_generate_exhaustion: true
   prefetch_next_bug: true          # start next generate while player answers (optional)
 
+recovery:
+  enabled: true                    # partial-credit quiz; off = reveal and continue
+  choice_count: 4                  # 1 correct + (n-1) distractors (3–5)
+  timeout_seconds: 4               # LLM distractor budget; then seed-bank fallback
+  max_llm_calls: 1                 # one attempt per partial; 0 = seed-bank only
+  use_seed_bank_fallback: true     # still show a quiz if the extra call fails
+
 metrics:
   log_per_bug: true                # latency, generate_attempts, freshness_rejects, judge_called
   log_dir_name: logs               # under Application Support

@@ -192,7 +192,11 @@ def test_round_api_openai_mocked_no_key_leak(tmp_path: Path, monkeypatch) -> Non
                     "answer": "force unwrap nil optional",
                 },
             ).json()
-            assert result["expected_summary"]
+            if result.get("recovery_available"):
+                assert result["expected_summary"] == ""
+                assert result["recovery_options"]
+            else:
+                assert result["expected_summary"]
             assert result["points_possible"] == 10
             assert "correct" in result
 

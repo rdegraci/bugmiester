@@ -17,12 +17,19 @@ __all__ = [
     "ParseError",
     "SnippetWithKey",
     "generate_bug",
+    "generate_recovery_distractors",
     "judge_answer",
 ]
 
 
 def __getattr__(name: str) -> Any:
-    if name in {"generate_bug", "judge_answer", "GenerateBugResult"}:
+    if name in {
+        "generate_bug",
+        "generate_recovery_distractors",
+        "judge_answer",
+        "GenerateBugResult",
+        "RecoveryLlmError",
+    }:
         from bugmiester.llm import facade
 
         return getattr(facade, name)

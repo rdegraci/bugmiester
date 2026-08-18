@@ -388,3 +388,31 @@ class MockProvider:
             confidence=0.9,
         )
 
+    def recovery_raw(self, prompt: str, settings: Settings | None = None) -> str:
+        """Wrong-answer summaries from other canned snippets (no network)."""
+        del settings
+        needed = 3
+        count_match = re.search(r"exactly (\d+) strings", prompt, flags=re.I)
+        if count_match:
+            needed = max(1, int(count_match.group(1)))
+        expected = ""
+        expected_match = re.search(
+            r"The ONE real bug is:\n([\s\S]*?)\n\nPlayer partial answer",
+            prompt,
+        )
+        if expected_match:
+            expected = expected_match.group(1).strip()
+        distractors: list[str] = []
+        seen = {expected.strip().lower()}
+        for snip in self._snippets:
+            summary = snip.bug_summary.strip()
+            key = summary.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            distractors.append(summary)
+            if len(distractors) >= needed:
+                break
+        return json.dumps({"distractors": distractors})
+
+

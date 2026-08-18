@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from bugmiester.analyze import analyze, get_summary
 from bugmiester.config import Settings, default_examples_dir, load_settings
-from bugmiester.models import NextBugRequest, ReportSnippetRequest, SubmitRequest
+from bugmiester.models import NextBugRequest, ReportSnippetRequest, RecoverRequest, SubmitRequest
 from bugmiester.reports import list_reports, load_report
 from bugmiester.rounds import RoundError, RoundStore
 
@@ -111,7 +111,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         current = _current_settings(app)
         store: RoundStore = app.state.rounds
         try:
-            return store.submit(
+            data = store.submit(
                 body.round_id,
                 body.snippet_id,
                 body.answer,
@@ -122,6 +122,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 status_code=exc.status_code,
                 detail={"message": exc.message, "code": exc.code},
             ) from exc
+        for key in ("bug_summary", "bug_category", "hints", "keywords"):
+            data.pop(key, None)
+        for option in data.get("recovery_options") or []:
+            if isinstance(option, dict):
+                option.pop("correct", None)
+        return data
+
+    @app.post("/api/round/recover")
+    def api_round_recover(body: RecoverRequest) -> dict:
+        current = _current_settings(app)
+        store: RoundStore = app.state.rounds
+        try:
+            data = store.recover(
+                body.round_id,
+                body.snippet_id,
+                body.option_id,
+                current,
+            ).model_dump()
+        except RoundError as exc:
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail={"message": exc.message, "code": exc.code},
+            ) from exc
+        for key in ("bug_summary", "bug_category", "hints", "keywords"):
+            data.pop(key, None)
+        for option in data.get("recovery_options") or []:
+            if isinstance(option, dict):
+                option.pop("correct", None)
+        return data
 
     @app.post("/api/round/report-snippet")
     def api_round_report_snippet(body: ReportSnippetRequest) -> dict:

@@ -44,6 +44,15 @@ JUDGE_JSON_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
 }
 
+RECOVERY_JSON_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "distractors": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["distractors"],
+    "additionalProperties": False,
+}
+
 
 class AnthropicConfigError(RuntimeError):
     """Missing / unusable Anthropic API key."""
@@ -117,6 +126,7 @@ def _messages_json(
     tool_description: str,
     schema: dict[str, Any],
     max_tokens: int = 2048,
+    timeout_seconds: float | None = None,
 ) -> str:
     """
     Force structured JSON via Anthropic tool_use (reliable Messages strategy).
@@ -124,6 +134,8 @@ def _messages_json(
     Falls back to plain text JSON if tool_use is rejected by the API/model.
     """
     client = _build_client(settings)
+    if timeout_seconds is not None and hasattr(client, "with_options"):
+        client = client.with_options(timeout=float(timeout_seconds))
     model = settings.llm.model
     messages = [{"role": "user", "content": user}]
     tools = [
@@ -216,4 +228,22 @@ def judge_raw(prompt: str, settings: Settings) -> str:
         tool_description="Score whether the player identified the intended bug.",
         schema=JUDGE_JSON_SCHEMA,
         max_tokens=1024,
+    )
+
+
+def recovery_raw(prompt: str, settings: Settings) -> str:
+    """Call Anthropic for recovery distractors (short timeout)."""
+    return _messages_json(
+        settings,
+        system=(
+            "You write plausible wrong answers for a Swift bug quiz. "
+            "Fill the tool arguments with recovery JSON."
+        ),
+        user=prompt,
+        temperature=float(settings.llm.temperature),
+        tool_name="bugmiester_recovery",
+        tool_description="Record wrong multiple-choice answers that are not the real bug.",
+        schema=RECOVERY_JSON_SCHEMA,
+        max_tokens=1024,
+        timeout_seconds=float(settings.recovery.timeout_seconds),
     )

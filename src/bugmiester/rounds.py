@@ -9,7 +9,8 @@ from dataclasses import dataclass, field
 
 from bugmiester.config import Settings
 from bugmiester.freshness import GeneratedSnippet, HistoryEntry, history_entry
-from bugmiester.llm import generate_bug, judge_answer
+from bugmiester.llm import generate_bug, generate_recovery_distractors, judge_answer
+from bugmiester.llm.facade import RecoveryLlmError
 from bugmiester.llm.anthropic_provider import (
     AnthropicConfigError,
     AnthropicRequestError,
@@ -20,9 +21,19 @@ from bugmiester.metrics import MetricsCollector
 from bugmiester.models import (
     NextBugResponse,
     ReportSnippetResponse,
+    RecoveryChoice,
     RoundStartResponse,
     RoundSummary,
     SubmitResponse,
+)
+from bugmiester.recovery import (
+    RECOVERY_PROMPT,
+    RecoveryOption,
+    assemble_options,
+    fill_from_seed_bank,
+    filter_distractors,
+    public_choices,
+    strip_expected_from_feedback,
 )
 from bugmiester.reports import write_report
 from bugmiester.scoring import score_answer
@@ -102,6 +113,8 @@ class StoredSnippet:
     partial: bool | None = None
     judge_called: bool = False
     reported: bool = False
+    recovery_open: bool = False
+    recovery_options: tuple[RecoveryOption, ...] = ()
 
 
 @dataclass
@@ -300,13 +313,32 @@ class RoundStore:
             raise
         submit_ms = (time.perf_counter() - started) * 1000.0
 
-        stored.answered = True
         stored.player_answer = answer
         stored.points_awarded = scored.points_awarded
         stored.points_possible = scored.points_possible
         stored.correct = scored.correct
         stored.partial = scored.partial
         stored.judge_called = scored.judge_called
+
+        recovery_options: list[RecoveryOption] = []
+        offer_recovery = (
+            settings.recovery.enabled
+            and scored.partial
+            and not scored.correct
+            and settings.scoring.partial_credit
+        )
+        if offer_recovery:
+            recovery_options = self._build_recovery_options(
+                stored,
+                answer=answer,
+                settings=settings,
+            )
+            if not recovery_options:
+                offer_recovery = False
+
+        stored.answered = True
+        stored.recovery_open = offer_recovery
+        stored.recovery_options = tuple(recovery_options)
 
         state.round_score += scored.points_awarded
         if scored.correct:
@@ -331,25 +363,15 @@ class RoundStore:
         answered_index = stored.index
         state.index += 1
         state.pending = None
-        round_complete = state.index >= state.bugs_per_round
-        if round_complete:
-            state.complete = True
-            if settings.metrics.log_per_bug:
-                self.metrics.flush_round(
-                    settings.logs_dir,
-                    round_id,
-                    round_score=state.round_score,
-                )
+        round_complete = self._maybe_complete(state, settings)
 
-        summary = None
-        if round_complete:
-            summary = RoundSummary(
-                round_score=state.round_score,
-                round_possible=state.bugs_per_round * state.points_per_bug,
-                correct_count=state.correct_count,
-                partial_count=state.partial_count,
-                incorrect_count=state.incorrect_count,
+        feedback = scored.feedback
+        expected_out = scored.expected_summary
+        if offer_recovery:
+            feedback = strip_expected_from_feedback(
+                scored.feedback, stored.bug_summary
             )
+            expected_out = ""
 
         return SubmitResponse(
             correct=scored.correct,
@@ -360,11 +382,153 @@ class RoundStore:
             round_possible=state.bugs_per_round * state.points_per_bug,
             index=answered_index,
             bugs_per_round=state.bugs_per_round,
-            feedback=scored.feedback,
-            expected_summary=scored.expected_summary,
+            feedback=feedback,
+            expected_summary=expected_out,
             round_complete=round_complete,
-            summary=summary,
+            summary=self._summary_if_complete(state, round_complete),
+            recovery_available=offer_recovery,
+            recovery_prompt=RECOVERY_PROMPT if offer_recovery else "",
+            recovery_options=[
+                RecoveryChoice(id=item["id"], text=item["text"])
+                for item in public_choices(recovery_options)
+            ],
         )
+
+    def recover(
+        self,
+        round_id: str,
+        snippet_id: str,
+        option_id: str | None,
+        settings: Settings,
+    ) -> SubmitResponse:
+        state = self._require(round_id)
+        stored = state.snippets.get(snippet_id)
+        if stored is None:
+            raise RoundError("unknown_snippet", "Unknown snippet_id", status_code=404)
+        if not stored.recovery_open:
+            raise RoundError(
+                "no_recovery",
+                "No open recovery quiz for this snippet",
+            )
+
+        picked = (option_id or "").strip()
+        upgraded = False
+        if picked:
+            match = next(
+                (opt for opt in stored.recovery_options if opt.option_id == picked),
+                None,
+            )
+            if match is None:
+                raise RoundError("unknown_option", "Unknown recovery option")
+            if match.correct:
+                upgraded = True
+
+        stored.recovery_open = False
+        if upgraded:
+            previous = stored.points_awarded or 0
+            possible = stored.points_possible or state.points_per_bug
+            delta = max(0, possible - previous)
+            stored.points_awarded = possible
+            stored.correct = True
+            stored.partial = False
+            state.round_score += delta
+            state.correct_count += 1
+            if state.partial_count > 0:
+                state.partial_count -= 1
+            feedback = f"Yes — {stored.bug_summary}."
+        elif picked:
+            feedback = f"Not quite. Expected: {stored.bug_summary}."
+        else:
+            feedback = f"Kept partial credit. Expected: {stored.bug_summary}."
+
+        if settings.metrics.log_per_bug:
+            self.metrics.record_recovery(
+                round_id,
+                snippet_id,
+                points_awarded=stored.points_awarded or 0,
+                correct=bool(stored.correct),
+                partial=bool(stored.partial),
+                round_score=state.round_score,
+            )
+
+        round_complete = self._maybe_complete(state, settings)
+        return SubmitResponse(
+            correct=bool(stored.correct),
+            partial=bool(stored.partial),
+            points_awarded=stored.points_awarded or 0,
+            points_possible=stored.points_possible or state.points_per_bug,
+            round_score=state.round_score,
+            round_possible=state.bugs_per_round * state.points_per_bug,
+            index=stored.index,
+            bugs_per_round=state.bugs_per_round,
+            feedback=feedback,
+            expected_summary=stored.bug_summary,
+            round_complete=round_complete,
+            summary=self._summary_if_complete(state, round_complete),
+            recovery_available=False,
+            upgraded=upgraded,
+        )
+
+    def _build_recovery_options(
+        self,
+        stored: StoredSnippet,
+        *,
+        answer: str,
+        settings: Settings,
+    ) -> list[RecoveryOption]:
+        needed = max(1, settings.recovery.choice_count - 1)
+        distractors: list[str] = []
+        try:
+            raw_list = generate_recovery_distractors(
+                code=stored.code,
+                expected_summary=stored.bug_summary,
+                player_answer=answer,
+                settings=settings,
+            )
+            distractors = filter_distractors(
+                raw_list, stored.bug_summary, needed=needed
+            )
+        except RecoveryLlmError:
+            distractors = []
+
+        if len(distractors) < needed and settings.recovery.use_seed_bank_fallback:
+            distractors = fill_from_seed_bank(
+                stored.bug_summary, distractors, needed=needed
+            )
+        assembled = assemble_options(
+            stored.bug_summary,
+            distractors,
+            choice_count=settings.recovery.choice_count,
+        )
+        return assembled or []
+
+    def _maybe_complete(self, state: RoundState, settings: Settings) -> bool:
+        if state.index < state.bugs_per_round:
+            return False
+        if any(snip.recovery_open for snip in state.snippets.values()):
+            return False
+        state.complete = True
+        if settings.metrics.log_per_bug:
+            self.metrics.flush_round(
+                settings.logs_dir,
+                state.round_id,
+                round_score=state.round_score,
+            )
+        return True
+
+    def _summary_if_complete(
+        self, state: RoundState, round_complete: bool
+    ) -> RoundSummary | None:
+        if not round_complete:
+            return None
+        return RoundSummary(
+            round_score=state.round_score,
+            round_possible=state.bugs_per_round * state.points_per_bug,
+            correct_count=state.correct_count,
+            partial_count=state.partial_count,
+            incorrect_count=state.incorrect_count,
+        )
+
 
     def report_snippet(
         self,

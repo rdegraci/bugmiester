@@ -157,3 +157,26 @@ def parse_judge_payload(raw: str | dict[str, Any]) -> JudgeResult:
         feedback=feedback,
         confidence=confidence,
     )
+
+
+def parse_recovery_payload(raw: str | dict[str, Any], *, needed: int) -> list[str]:
+    """Validate recovery JSON → list of distractor strings."""
+    data = loads_json_object(raw)
+    if "distractors" not in data:
+        raise ParseError("Missing required recovery key: distractors")
+    items = data["distractors"]
+    if not isinstance(items, list):
+        raise ParseError("'distractors' must be an array of strings")
+    distractors: list[str] = []
+    for item in items:
+        if not isinstance(item, str):
+            raise ParseError("'distractors' entries must be strings")
+        cleaned = item.strip()
+        if cleaned:
+            distractors.append(cleaned)
+    if len(distractors) < needed:
+        raise ParseError(
+            f"Need at least {needed} distractors, got {len(distractors)}"
+        )
+    return distractors[: max(needed, len(distractors))]
+

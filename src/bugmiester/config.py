@@ -72,6 +72,15 @@ class ResilienceSettings:
 
 
 @dataclass(frozen=True)
+class RecoverySettings:
+    enabled: bool = True
+    choice_count: int = 4
+    timeout_seconds: int = 4
+    max_llm_calls: int = 1
+    use_seed_bank_fallback: bool = True
+
+
+@dataclass(frozen=True)
 class MetricsSettings:
     log_per_bug: bool = True
     log_dir_name: str = DEFAULT_LOGS_DIR
@@ -106,6 +115,7 @@ class Settings:
     scoring: ScoringSettings = field(default_factory=ScoringSettings)
     freshness: FreshnessSettings = field(default_factory=FreshnessSettings)
     resilience: ResilienceSettings = field(default_factory=ResilienceSettings)
+    recovery: RecoverySettings = field(default_factory=RecoverySettings)
     metrics: MetricsSettings = field(default_factory=MetricsSettings)
     reports: ReportsSettings = field(default_factory=ReportsSettings)
     feedback: FeedbackSettings = field(default_factory=FeedbackSettings)
@@ -121,6 +131,14 @@ class Settings:
     @property
     def logs_dir(self) -> Path:
         return self.app_dir / self.metrics.log_dir_name
+
+
+def _clamp_int(value: Any, *, lo: int, hi: int, default: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = default
+    return max(lo, min(hi, parsed))
 
 
 def _as_optional_str(value: Any) -> str | None:
@@ -143,6 +161,7 @@ def _parse_yaml_config(raw: Mapping[str, Any]) -> dict[str, Any]:
     scoring_raw = _section(raw, "scoring")
     freshness_raw = _section(raw, "freshness")
     resilience_raw = _section(raw, "resilience")
+    recovery_raw = _section(raw, "recovery")
     metrics_raw = _section(raw, "metrics")
     reports_raw = _section(raw, "reports")
     feedback_raw = _section(raw, "feedback")
@@ -188,6 +207,21 @@ def _parse_yaml_config(raw: Mapping[str, Any]) -> dict[str, Any]:
                 resilience_raw.get("use_canned_fallback_on_generate_exhaustion", True)
             ),
             prefetch_next_bug=bool(resilience_raw.get("prefetch_next_bug", True)),
+        ),
+        "recovery": RecoverySettings(
+            enabled=bool(recovery_raw.get("enabled", True)),
+            choice_count=_clamp_int(
+                recovery_raw.get("choice_count", 4), lo=3, hi=5, default=4
+            ),
+            timeout_seconds=_clamp_int(
+                recovery_raw.get("timeout_seconds", 4), lo=1, hi=15, default=4
+            ),
+            max_llm_calls=_clamp_int(
+                recovery_raw.get("max_llm_calls", 1), lo=0, hi=1, default=1
+            ),
+            use_seed_bank_fallback=bool(
+                recovery_raw.get("use_seed_bank_fallback", True)
+            ),
         ),
         "metrics": MetricsSettings(
             log_per_bug=bool(metrics_raw.get("log_per_bug", True)),
@@ -335,6 +369,7 @@ def load_settings(
         scoring=parsed["scoring"],
         freshness=parsed["freshness"],
         resilience=parsed["resilience"],
+        recovery=parsed["recovery"],
         metrics=metrics,
         reports=reports,
         feedback=parsed["feedback"],

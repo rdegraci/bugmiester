@@ -154,6 +154,11 @@ def test_load_settings_mock_always_ready(tmp_path: Path) -> None:
     assert settings.config_ready is True
     assert settings.missing_key is None
     assert settings.api_key is None
+    assert settings.recovery.enabled is True
+    assert settings.recovery.choice_count == 4
+    assert settings.recovery.timeout_seconds == 4
+    assert settings.recovery.max_llm_calls == 1
+    assert settings.recovery.use_seed_bank_fallback is True
 
 
 def test_resolve_provider_key_helpers() -> None:

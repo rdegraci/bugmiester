@@ -130,6 +130,28 @@ class MetricsCollector:
                 return bug
         return None
 
+    def record_recovery(
+        self,
+        round_id: str,
+        snippet_id: str,
+        *,
+        points_awarded: int,
+        correct: bool,
+        partial: bool,
+        round_score: int,
+    ) -> BugMetrics | None:
+        round_metrics = self._rounds.get(round_id)
+        if round_metrics is None:
+            return None
+        for bug in round_metrics.bugs:
+            if bug.snippet_id == snippet_id:
+                bug.points_awarded = points_awarded
+                bug.correct = correct
+                bug.partial = partial
+                round_metrics.round_score = round_score
+                return bug
+        return None
+
     def flush_round(
         self,
         logs_dir: Path,

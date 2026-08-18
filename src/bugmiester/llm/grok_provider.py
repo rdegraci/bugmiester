@@ -45,6 +45,15 @@ JUDGE_JSON_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
 }
 
+RECOVERY_JSON_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "distractors": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["distractors"],
+    "additionalProperties": False,
+}
+
 
 class GrokConfigError(RuntimeError):
     """Missing / unusable Grok (xAI) API key."""
@@ -104,8 +113,11 @@ def _chat_json(
     temperature: float,
     schema_name: str,
     schema: dict[str, Any],
+    timeout_seconds: float | None = None,
 ) -> str:
     client = _build_client(settings)
+    if timeout_seconds is not None and hasattr(client, "with_options"):
+        client = client.with_options(timeout=float(timeout_seconds))
     model = settings.llm.model
     messages = [
         {"role": "system", "content": system},
@@ -175,4 +187,20 @@ def judge_raw(prompt: str, settings: Settings) -> str:
         temperature=float(settings.llm.judge_temperature),
         schema_name="bugmiester_judge",
         schema=JUDGE_JSON_SCHEMA,
+    )
+
+
+def recovery_raw(prompt: str, settings: Settings) -> str:
+    """Call Grok for recovery distractors (short timeout)."""
+    return _chat_json(
+        settings,
+        system=(
+            "You write plausible wrong answers for a Swift bug quiz. "
+            "Reply with JSON only."
+        ),
+        user=prompt,
+        temperature=float(settings.llm.temperature),
+        schema_name="bugmiester_recovery",
+        schema=RECOVERY_JSON_SCHEMA,
+        timeout_seconds=float(settings.recovery.timeout_seconds),
     )

@@ -225,7 +225,10 @@ def test_mock_round_sensible_scores_and_expected_summary(
                 ),
             },
         ).json()
-        assert strong["expected_summary"]
+        if strong.get("recovery_available"):
+            assert strong["expected_summary"] == ""
+        else:
+            assert strong["expected_summary"]
         assert strong["feedback"]
         assert "partial" in strong
         assert strong["points_possible"] == 10

@@ -16,15 +16,17 @@ from bugmiester.freshness import (
 )
 from bugmiester.llm.base import JudgeResult, SnippetWithKey
 from bugmiester.llm.mock_provider import MockProvider
-from bugmiester.llm.parse import ParseError, parse_generation_payload, parse_judge_payload
-from bugmiester.llm.prompts import build_generation_prompt, build_judge_prompt
+from bugmiester.llm.parse import ParseError, parse_generation_payload, parse_judge_payload, parse_recovery_payload
+from bugmiester.llm.prompts import build_generation_prompt, build_judge_prompt, build_recovery_prompt
 
 __all__ = [
     "GenerateBugResult",
     "JudgeResult",
     "ParseError",
+    "RecoveryLlmError",
     "SnippetWithKey",
     "generate_bug",
+    "generate_recovery_distractors",
     "judge_answer",
 ]
 
@@ -207,3 +209,70 @@ def judge_answer(
     raise ProviderNotImplementedError(
         f"Unknown llm.provider '{provider}'. Expected openai|anthropic|grok|mock."
     )
+
+
+class RecoveryLlmError(RuntimeError):
+    """Distractor generation failed or timed out."""
+
+
+def _call_with_timeout(fn, timeout_seconds: int):
+    import concurrent.futures
+
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    try:
+        future = pool.submit(fn)
+        return future.result(timeout=float(timeout_seconds))
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+
+
+def generate_recovery_distractors(
+    *,
+    code: str,
+    expected_summary: str,
+    player_answer: str,
+    settings: Settings,
+) -> list[str]:
+    """
+    One capped LLM call for wrong quiz answers.
+
+    Raises RecoveryLlmError on skip, timeout, parse failure, or provider error.
+    """
+    needed = max(1, settings.recovery.choice_count - 1)
+    if settings.recovery.max_llm_calls <= 0:
+        raise RecoveryLlmError("recovery.max_llm_calls is 0")
+
+    provider = _provider_name(settings)
+    prompt = build_recovery_prompt(
+        code=code,
+        expected_summary=expected_summary,
+        player_answer=player_answer,
+        distractor_count=needed,
+    )
+
+    def _invoke() -> str:
+        if provider == "mock":
+            return _MOCK.recovery_raw(prompt, settings)
+        if provider == "openai":
+            from bugmiester.llm import openai_provider
+
+            return openai_provider.recovery_raw(prompt, settings)
+        if provider == "anthropic":
+            from bugmiester.llm import anthropic_provider
+
+            return anthropic_provider.recovery_raw(prompt, settings)
+        if provider == "grok":
+            from bugmiester.llm import grok_provider
+
+            return grok_provider.recovery_raw(prompt, settings)
+        raise ProviderNotImplementedError(
+            f"Unknown llm.provider '{provider}'. Expected openai|anthropic|grok|mock."
+        )
+
+    try:
+        raw = _call_with_timeout(_invoke, settings.recovery.timeout_seconds)
+        return parse_recovery_payload(raw, needed=needed)
+    except ProviderNotImplementedError:
+        raise
+    except Exception as exc:  # noqa: BLE001 — timeout, parse, provider
+        raise RecoveryLlmError(str(exc) or "recovery distractors failed") from exc

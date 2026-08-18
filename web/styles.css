@@ -87,6 +87,25 @@ body {
   color: var(--bm-ink);
 }
 
+.recovery-panel {
+  background: var(--bm-panel);
+  border: 1px solid var(--bm-line);
+  border-radius: 0.5rem;
+  padding: 0.85rem 1rem;
+}
+
+.recovery-panel .list-group-item {
+  background: var(--bm-code);
+  border-color: var(--bm-line);
+  color: var(--bm-ink);
+}
+
+.recovery-panel .list-group-item:hover,
+.recovery-panel .list-group-item:focus {
+  background: #1c2a38;
+  color: var(--bm-ink);
+}
+
 .border-top {
   border-color: var(--bm-line) !important;
 }

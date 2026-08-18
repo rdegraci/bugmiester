@@ -139,6 +139,15 @@ def test_ops_api_and_cli_after_mock_round(
                     ),
                 },
             ).json()
+            if submit.get("recovery_available"):
+                submit = client.post(
+                    "/api/round/recover",
+                    json={
+                        "round_id": round_id,
+                        "snippet_id": bug["snippet_id"],
+                        "option_id": None,
+                    },
+                ).json()
             if i == 0:
                 report = client.post(
                     "/api/round/report-snippet",

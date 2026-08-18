@@ -9,6 +9,8 @@
     roundScore: document.getElementById("round-score"),
     roundPossible: document.getElementById("round-possible"),
     progressStatus: document.getElementById("progress-status"),
+    progressSpinner: document.getElementById("progress-spinner"),
+    progressText: document.getElementById("progress-text"),
     degradedIndicator: document.getElementById("degraded-indicator"),
     codeContent: document.getElementById("code-content"),
     answerForm: document.getElementById("answer-form"),
@@ -22,6 +24,12 @@
     feedbackPanel: document.getElementById("feedback-panel"),
     feedbackText: document.getElementById("feedback-text"),
     expectedSummary: document.getElementById("expected-summary"),
+    recoveryPanel: document.getElementById("recovery-panel"),
+    recoveryPrompt: document.getElementById("recovery-prompt"),
+    recoveryWorking: document.getElementById("recovery-working"),
+    recoveryWorkingText: document.getElementById("recovery-working-text"),
+    recoveryChoices: document.getElementById("recovery-choices"),
+    btnRecoveryContinue: document.getElementById("btn-recovery-continue"),
     btnPlayAgain: document.getElementById("btn-play-again"),
     modalScore: document.getElementById("modal-score"),
     modalPossible: document.getElementById("modal-possible"),
@@ -37,6 +45,7 @@
     roundComplete: false,
     configReady: false,
     reportedCurrent: false,
+    recoveryOpen: false,
     prefetchEnabled: true,
     prefetch: {
       token: 0,
@@ -59,8 +68,15 @@
     els.codeContent.textContent = text;
   }
 
-  function setProgress(message) {
-    els.progressStatus.textContent = message || "";
+  function setProgress(message, spinning) {
+    const text = message || "";
+    if (els.progressText) {
+      els.progressText.textContent = text;
+    } else if (els.progressStatus) {
+      els.progressStatus.textContent = text;
+    }
+    const spin = spinning === true || (spinning !== false && Boolean(text) && state.busy);
+    setHidden(els.progressSpinner, !spin);
   }
 
   function bugsPerRound() {
@@ -109,7 +125,11 @@
     els.btnSubmit.disabled =
       busy || !answering || !els.answerInput.value.trim();
     els.btnNext.disabled =
-      busy || !state.hasFeedback || state.roundComplete || !state.roundId;
+      busy ||
+      !state.hasFeedback ||
+      state.roundComplete ||
+      !state.roundId ||
+      state.recoveryOpen;
     els.btnReport.disabled =
       busy || !state.hasFeedback || state.reportedCurrent || !state.snippetId;
     if (els.reportReason) {
@@ -117,6 +137,15 @@
         busy || !state.hasFeedback || state.reportedCurrent;
     }
     els.answerInput.disabled = busy || !answering;
+    if (els.btnRecoveryContinue) {
+      els.btnRecoveryContinue.disabled = busy || !state.recoveryOpen;
+    }
+    if (els.recoveryChoices) {
+      const buttons = els.recoveryChoices.querySelectorAll("button");
+      for (let i = 0; i < buttons.length; i += 1) {
+        buttons[i].disabled = busy || !state.recoveryOpen;
+      }
+    }
   }
 
   function showSetupBanner(message) {
@@ -144,9 +173,11 @@
 
   function showFeedback(result) {
     els.feedbackText.textContent = result.feedback || "";
-    els.expectedSummary.textContent = result.expected_summary
-      ? `Expected: ${result.expected_summary}`
-      : "";
+    const hideExpected = Boolean(result.recovery_available);
+    els.expectedSummary.textContent =
+      !hideExpected && result.expected_summary
+        ? `Expected: ${result.expected_summary}`
+        : "";
     els.feedbackPanel.classList.remove(
       "alert-success",
       "alert-danger",
@@ -164,6 +195,11 @@
     state.hasFeedback = true;
     state.reportedCurrent = false;
     setHidden(els.reportControls, false);
+    if (result.recovery_available) {
+      showRecovery(result);
+    } else {
+      hideRecovery();
+    }
   }
 
   function clearFeedback() {
@@ -173,6 +209,56 @@
     state.hasFeedback = false;
     state.reportedCurrent = false;
     setHidden(els.reportControls, true);
+    hideRecovery();
+  }
+
+  function hideRecovery() {
+    state.recoveryOpen = false;
+    if (els.recoveryChoices) {
+      els.recoveryChoices.replaceChildren();
+    }
+    setHidden(els.recoveryWorking, true);
+    setHidden(els.recoveryPanel, true);
+  }
+
+  function showRecovery(result) {
+    state.recoveryOpen = true;
+    if (els.recoveryPrompt) {
+      els.recoveryPrompt.textContent =
+        result.recovery_prompt ||
+        "Partial credit. Pick the precise bug for full points, or continue to keep the partial.";
+    }
+    renderRecoveryChoices(result.recovery_options || []);
+    setHidden(els.recoveryWorking, true);
+    setHidden(els.recoveryPanel, false);
+  }
+
+  function renderRecoveryChoices(options) {
+    if (!els.recoveryChoices) return;
+    els.recoveryChoices.replaceChildren();
+    for (let i = 0; i < options.length; i += 1) {
+      const option = options[i];
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "list-group-item list-group-item-action";
+      btn.textContent = option.text || "";
+      btn.dataset.optionId = option.id || "";
+      btn.addEventListener("click", onRecoverChoice);
+      els.recoveryChoices.appendChild(btn);
+    }
+  }
+
+  function setRecoveryWorking(message) {
+    if (els.recoveryWorkingText) {
+      els.recoveryWorkingText.textContent = message || "Working…";
+    }
+    setHidden(els.recoveryWorking, !message);
+    if (els.recoveryChoices) {
+      setHidden(els.recoveryChoices, Boolean(message));
+    }
+    if (els.btnRecoveryContinue) {
+      setHidden(els.btnRecoveryContinue, Boolean(message));
+    }
   }
 
   function setDegraded(visible) {
@@ -258,7 +344,7 @@
   async function requestNextBug(showProgress) {
     const n = state.nextBugNumber;
     if (showProgress) {
-      setProgress(`Generating bug ${n}/${bugsPerRound()}…`);
+      setProgress(`Generating bug ${n}/${bugsPerRound()}…`, true);
     }
     return api("/api/round/next-bug", {
       method: "POST",
@@ -283,7 +369,7 @@
     state.prefetch.bug = null;
     state.prefetch.error = null;
     state.prefetch.inFlight = true;
-    setProgress(`Preparing bug ${n}/${bugsPerRound()}…`);
+    setProgress(`Preparing bug ${n}/${bugsPerRound()}…`, true);
 
     const promise = requestNextBug(false)
       .then((bug) => {
@@ -298,7 +384,7 @@
         state.prefetch.bug = bug;
         state.prefetch.inFlight = false;
         if (state.hasFeedback && !state.busy) {
-          setProgress(`Bug ${n}/${bugsPerRound()} ready`);
+          setProgress(`Bug ${n}/${bugsPerRound()} ready`, false);
         }
         return bug;
       })
@@ -342,7 +428,8 @@
       !state.roundComplete
     ) {
       setProgress(
-        `Generating bug ${state.nextBugNumber}/${bugsPerRound()}…`
+        `Generating bug ${state.nextBugNumber}/${bugsPerRound()}…`,
+        true
       );
       await state.prefetch.promise;
       if (
@@ -372,7 +459,7 @@
     state.roundComplete = false;
     state.nextBugNumber = 1;
     try {
-      setProgress("Starting round…");
+      setProgress("Starting round…", true);
       const started = await api("/api/round/start", {
         method: "POST",
         body: "{}",
@@ -397,7 +484,7 @@
     const answer = els.answerInput.value.trim();
     if (!answer) return;
     setBusy(true);
-    setProgress("Scoring…");
+    setProgress("Checking your answer…", true);
     try {
       const result = await api("/api/round/submit", {
         method: "POST",
@@ -410,7 +497,7 @@
       updateRoundChrome(result);
       showFeedback(result);
       state.roundComplete = Boolean(result.round_complete);
-      setProgress("");
+      setProgress("", false);
       setBusy(false);
       if (result.round_complete) {
         invalidatePrefetch();
@@ -436,7 +523,8 @@
       state.busy ||
       !state.hasFeedback ||
       state.roundComplete ||
-      !state.roundId
+      !state.roundId ||
+      state.recoveryOpen
     ) {
       return;
     }
@@ -449,6 +537,71 @@
       setCode(formatApiError(err) || "Could not load next bug.");
       setBusy(false);
     }
+  }
+
+  async function sendRecover(optionId) {
+    if (state.busy || !state.recoveryOpen || !state.roundId || !state.snippetId) {
+      return;
+    }
+    const snippetId = state.snippetId;
+    setBusy(true);
+    setRecoveryWorking("Checking your choice…");
+    setProgress("Checking your choice…", true);
+    try {
+      const result = await api("/api/round/recover", {
+        method: "POST",
+        body: JSON.stringify({
+          round_id: state.roundId,
+          snippet_id: snippetId,
+          option_id: optionId,
+        }),
+      });
+      setRecoveryWorking("");
+      hideRecovery();
+      updateRoundChrome(result);
+      showFeedback(result);
+      state.roundComplete = Boolean(result.round_complete);
+      setProgress("", false);
+      setBusy(false);
+      if (result.round_complete) {
+        invalidatePrefetch();
+        showRoundCompleteModal(result);
+        els.btnNext.disabled = true;
+      } else if (state.prefetchEnabled && !state.prefetch.inFlight && !state.prefetch.bug) {
+        startPrefetch();
+      } else if (state.prefetch.bug && !state.roundComplete) {
+        setProgress(
+          `Bug ${state.nextBugNumber}/${bugsPerRound()} ready`,
+          false
+        );
+      } else if (state.prefetch.inFlight && !state.roundComplete) {
+        setProgress(
+          `Preparing bug ${state.nextBugNumber}/${bugsPerRound()}…`,
+          true
+        );
+      }
+    } catch (err) {
+      setRecoveryWorking("");
+      if (els.recoveryChoices) {
+        setHidden(els.recoveryChoices, false);
+      }
+      if (els.btnRecoveryContinue) {
+        setHidden(els.btnRecoveryContinue, false);
+      }
+      setProgress(formatApiError(err) || "Recovery failed", false);
+      setBusy(false);
+    }
+  }
+
+  function onRecoverChoice(event) {
+    const btn = event.currentTarget;
+    const optionId = btn && btn.dataset ? btn.dataset.optionId : "";
+    if (!optionId) return;
+    sendRecover(optionId);
+  }
+
+  function onRecoverContinue() {
+    sendRecover(null);
   }
 
   async function onReport() {
@@ -465,7 +618,7 @@
     // Keep current snippet_id for report even if prefetch already advanced server pending.
     const snippetId = state.snippetId;
     setBusy(true);
-    setProgress("Sending report…");
+    setProgress("Sending report…", true);
     try {
       await api("/api/round/report-snippet", {
         method: "POST",
@@ -477,16 +630,18 @@
         }),
       });
       state.reportedCurrent = true;
-      setProgress("Report saved.");
+      setProgress("Report saved.", false);
       setBusy(false);
       // Restore soft prefetch status if a next bug is already ready.
       if (state.prefetch.bug && !state.roundComplete) {
         setProgress(
-          `Bug ${state.nextBugNumber}/${bugsPerRound()} ready`
+          `Bug ${state.nextBugNumber}/${bugsPerRound()} ready`,
+          false
         );
       } else if (state.prefetch.inFlight && !state.roundComplete) {
         setProgress(
-          `Preparing bug ${state.nextBugNumber}/${bugsPerRound()}…`
+          `Preparing bug ${state.nextBugNumber}/${bugsPerRound()}…`,
+          true
         );
       }
     } catch (err) {
@@ -510,6 +665,9 @@
   els.answerForm.addEventListener("submit", onSubmit);
   els.btnNext.addEventListener("click", onNext);
   els.btnReport.addEventListener("click", onReport);
+  if (els.btnRecoveryContinue) {
+    els.btnRecoveryContinue.addEventListener("click", onRecoverContinue);
+  }
   els.btnPlayAgain.addEventListener("click", onPlayAgain);
   els.answerInput.addEventListener("input", onAnswerInput);
 

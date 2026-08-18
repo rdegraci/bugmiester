@@ -69,6 +69,18 @@ def test_full_mock_round_no_answer_key_leak(tmp_path: Path, monkeypatch) -> None
                     "answer": answer,
                 },
             ).json()
+            if result.get("recovery_available"):
+                for option in result.get("recovery_options") or []:
+                    assert "correct" not in option
+                    assert "id" in option and "text" in option
+                result = client.post(
+                    "/api/round/recover",
+                    json={
+                        "round_id": round_id,
+                        "snippet_id": bug["snippet_id"],
+                        "option_id": None,
+                    },
+                ).json()
             assert "expected_summary" in result
             assert result["index"] == i
             assert result["round_complete"] is (i == 9)

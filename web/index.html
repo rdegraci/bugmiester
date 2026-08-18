@@ -30,7 +30,17 @@
           · Score <span id="round-score">0</span> /
           <span id="round-possible">100</span>
         </div>
-        <div id="progress-status" class="text-secondary small" aria-live="polite"></div>
+        <div id="progress-status" class="text-secondary small d-flex align-items-center gap-2" aria-live="polite">
+          <span
+            id="progress-spinner"
+            class="spinner-border spinner-border-sm d-none"
+            role="status"
+            hidden
+          >
+            <span class="visually-hidden">Working</span>
+          </span>
+          <span id="progress-text"></span>
+        </div>
         <div
           id="degraded-indicator"
           class="badge text-bg-secondary d-none"
@@ -53,6 +63,31 @@
           placeholder="Describe the bug in a short sentence"
           disabled
         ></textarea>
+        <div
+          id="recovery-panel"
+          class="recovery-panel mt-3 d-none"
+          hidden
+        >
+          <p id="recovery-prompt" class="mb-2"></p>
+          <div
+            id="recovery-working"
+            class="d-flex align-items-center gap-2 text-secondary small mb-2 d-none"
+            hidden
+          >
+            <span class="spinner-border spinner-border-sm" role="status">
+              <span class="visually-hidden">Working</span>
+            </span>
+            <span id="recovery-working-text">Building choices…</span>
+          </div>
+          <div id="recovery-choices" class="list-group mb-2"></div>
+          <button
+            type="button"
+            id="btn-recovery-continue"
+            class="btn btn-outline-secondary btn-sm"
+          >
+            Keep partial credit
+          </button>
+        </div>
         <div class="d-flex flex-wrap gap-2 mt-3">
           <button type="button" id="btn-start" class="btn btn-primary">
             Start round

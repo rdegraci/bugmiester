@@ -44,6 +44,11 @@ class RoundSummary(BaseModel):
     incorrect_count: int
 
 
+class RecoveryChoice(BaseModel):
+    id: str
+    text: str
+
+
 class SubmitResponse(BaseModel):
     correct: bool
     partial: bool
@@ -57,6 +62,16 @@ class SubmitResponse(BaseModel):
     expected_summary: str
     round_complete: bool
     summary: RoundSummary | None = None
+    recovery_available: bool = False
+    recovery_prompt: str = ""
+    recovery_options: list[RecoveryChoice] = Field(default_factory=list)
+    upgraded: bool = False
+
+
+class RecoverRequest(BaseModel):
+    round_id: str
+    snippet_id: str
+    option_id: str | None = None
 
 
 class ReportSnippetRequest(BaseModel):

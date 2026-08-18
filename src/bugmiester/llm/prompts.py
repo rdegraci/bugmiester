@@ -93,3 +93,36 @@ Return ONLY valid JSON with these keys:
 - "feedback": string (short feedback for the player)
 - "confidence": number from 0.0 to 1.0
 """
+
+
+def build_recovery_prompt(
+    *,
+    code: str,
+    expected_summary: str,
+    player_answer: str,
+    distractor_count: int,
+) -> str:
+    """Prompt for wrong multiple-choice answers (not the real bug)."""
+    n = max(1, distractor_count)
+    return f"""You write wrong multiple-choice answers for a Swift bug-spotting game.
+
+Swift code:
+```
+{code}
+```
+
+The ONE real bug is:
+{expected_summary}
+
+Player partial answer (do not reuse this as a choice):
+{player_answer}
+
+Return ONLY valid JSON with this key:
+- "distractors": array of exactly {n} strings
+
+Rules:
+- Each distractor names a DIFFERENT defect a reader might believe is in this code.
+- Do not paraphrase the real bug.
+- One short sentence each.
+- No numbering, no labels like "A)" or "wrong".
+"""

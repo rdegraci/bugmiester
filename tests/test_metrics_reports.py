@@ -153,6 +153,15 @@ def test_full_mock_round_writes_log_and_report(
                     ),
                 },
             ).json()
+            if result.get("recovery_available"):
+                result = client.post(
+                    "/api/round/recover",
+                    json={
+                        "round_id": round_id,
+                        "snippet_id": bug["snippet_id"],
+                        "option_id": None,
+                    },
+                ).json()
             if i == 0:
                 reported_snippet_id = bug["snippet_id"]
                 reported = client.post(
