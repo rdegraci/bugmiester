@@ -1,1 +1,231 @@
-[]
+{
+  "version": 1,
+  "description": "Offline golden cases for keyword (+ optional mock judge) scoring checks. Expand toward 20–30 as playtesting finds gaps.",
+  "cases": [
+    {
+      "id": "opt-dict-force",
+      "code": "func firstName(from dict: [String: String]) -> String {\n    return dict[\"name\"]!\n}\n",
+      "expected_summary": "Force unwrap of a dictionary value that may be nil",
+      "bug_category": "optionals",
+      "keywords": ["force unwrap", "optional", "nil", "dictionary"],
+      "good_answers": [
+        "force unwrap on a nil optional from the dictionary",
+        "force unwrap of missing dictionary value"
+      ],
+      "bad_answers": [
+        "memory leak in the retain cycle",
+        "wrong return type String vs Int"
+      ]
+    },
+    {
+      "id": "col-empty-avg",
+      "code": "func average(_ values: [Int]) -> Int {\n    return values.reduce(0, +) / values.count\n}\n",
+      "expected_summary": "Division by zero when the array is empty",
+      "bug_category": "collections",
+      "keywords": ["division by zero", "empty", "count", "zero"],
+      "good_answers": [
+        "division by zero when the array is empty",
+        "empty array count causes divide by zero"
+      ],
+      "bad_answers": [
+        "force unwrap of an optional",
+        "off-by-one index on the array"
+      ]
+    },
+    {
+      "id": "ref-class-copy",
+      "code": "class Counter {\n    var value = 0\n}\n\nfunc bump(_ counter: Counter) {\n    var copy = counter\n    copy.value += 1\n}\n",
+      "expected_summary": "Misleading copy of a class reference; intent may assume value semantics",
+      "bug_category": "value vs reference",
+      "keywords": ["class", "reference", "copy", "struct"],
+      "good_answers": [
+        "copy is still a class reference not a struct value",
+        "class reference copy mutates the original"
+      ],
+      "bad_answers": [
+        "division by zero",
+        "missing await on async call"
+      ]
+    },
+    {
+      "id": "flow-switch-int",
+      "code": "func label(for status: Int) -> String {\n    switch status {\n    case 0:\n        return \"ok\"\n    case 1:\n        return \"retry\"\n    }\n}\n",
+      "expected_summary": "Switch on Int is not exhaustive; missing default or remaining cases",
+      "bug_category": "control flow",
+      "keywords": ["exhaustive", "switch", "default", "missing"],
+      "good_answers": [
+        "switch is not exhaustive missing default",
+        "non-exhaustive switch on Int needs default"
+      ],
+      "bad_answers": [
+        "force unwrap of nil",
+        "actor isolation without await"
+      ]
+    },
+    {
+      "id": "err-async-try",
+      "code": "func loadUser(id: String) async -> String {\n    let data = try await fetch(id)\n    return String(decoding: data, as: UTF8.self)\n}\n",
+      "expected_summary": "async function uses try without throws or try/catch handling",
+      "bug_category": "errors",
+      "keywords": ["throws", "try", "error", "async"],
+      "good_answers": [
+        "try without throws on the async function",
+        "async function uses try but does not throw"
+      ],
+      "bad_answers": [
+        "off-by-one index",
+        "optional string interpolation"
+      ]
+    },
+    {
+      "id": "col-off-by-one",
+      "code": "var items = [\"a\", \"b\", \"c\"]\nlet last = items[items.count]\nprint(last)\n",
+      "expected_summary": "Off-by-one index uses count instead of count - 1",
+      "bug_category": "collections",
+      "keywords": ["off-by-one", "index", "count", "out of range", "bounds"],
+      "good_answers": [
+        "off-by-one index uses count instead of count - 1",
+        "index out of range using items.count"
+      ],
+      "bad_answers": [
+        "force unwrap nil optional",
+        "missing throws on async"
+      ]
+    },
+    {
+      "id": "opt-greet-print",
+      "code": "func greet(_ name: String?) {\n    print(\"Hello, \\(name)\")\n}\n",
+      "expected_summary": "Optional String interpolated directly prints Optional(...) or is type-incorrect intent",
+      "bug_category": "optionals",
+      "keywords": ["optional", "unwrap", "interpolation", "nil"],
+      "good_answers": [
+        "optional string interpolated without unwrap",
+        "prints Optional because name is optional"
+      ],
+      "bad_answers": [
+        "division by zero on empty array",
+        "switch missing default case"
+      ]
+    },
+    {
+      "id": "err-try-optional",
+      "code": "import Foundation\n\nfunc save(text: String, to url: URL) {\n    try? text.write(to: url, atomically: true, encoding: .utf8)\n    print(\"saved\")\n}\n",
+      "expected_summary": "Ignoring write failure with try? still prints saved",
+      "bug_category": "errors",
+      "keywords": ["try?", "ignore", "error", "failure", "write"],
+      "good_answers": [
+        "try? ignores write failure but still prints saved",
+        "ignoring error with try? then claims saved"
+      ],
+      "bad_answers": [
+        "force unwrap dictionary value",
+        "class vs struct copy mistake"
+      ]
+    },
+    {
+      "id": "conc-actor-mut",
+      "code": "actor Box {\n    var value = 0\n}\n\nfunc bump(_ box: Box) async {\n    box.value += 1\n}\n",
+      "expected_summary": "Actor-isolated property mutated without await crossing isolation",
+      "bug_category": "concurrency",
+      "keywords": ["actor", "isolation", "await", "concurrency"],
+      "good_answers": [
+        "actor isolation mutated without await",
+        "missing await when crossing actor isolation"
+      ],
+      "bad_answers": [
+        "empty array division by zero",
+        "let struct cannot mutate"
+      ]
+    },
+    {
+      "id": "val-let-struct",
+      "code": "struct Point {\n    var x: Int\n    var y: Int\n}\n\nlet origin = Point(x: 0, y: 0)\norigin.x = 1\n",
+      "expected_summary": "Cannot mutate a let struct value; origin.x = 1 is illegal",
+      "bug_category": "value vs reference",
+      "keywords": ["let", "mutate", "struct", "immutable", "var"],
+      "good_answers": [
+        "cannot mutate a let struct value",
+        "origin is let so struct property mutate is illegal"
+      ],
+      "bad_answers": [
+        "force unwrap optional",
+        "non-exhaustive switch"
+      ]
+    },
+    {
+      "id": "opt-array-first",
+      "code": "func first(_ values: [Int]) -> Int {\n    return values[0]\n}\n",
+      "expected_summary": "Unconditional [0] crashes on an empty array",
+      "bug_category": "optionals",
+      "keywords": ["empty", "index", "crash", "bounds"],
+      "good_answers": [
+        "unconditional index 0 crashes on empty array",
+        "empty array bounds crash on values[0]"
+      ],
+      "bad_answers": [
+        "missing await on async function",
+        "try without throws"
+      ]
+    },
+    {
+      "id": "conc-await-miss",
+      "code": "func load() async -> String {\n    return fetchRemote()\n}\nfunc fetchRemote() async -> String { \"ok\" }\n",
+      "expected_summary": "Missing await when calling an async function",
+      "bug_category": "concurrency",
+      "keywords": ["await", "async", "missing"],
+      "good_answers": [
+        "missing await when calling async fetchRemote",
+        "async call without await"
+      ],
+      "bad_answers": [
+        "force unwrap nil",
+        "off-by-one using count"
+      ]
+    },
+    {
+      "id": "opt-as-force-cast",
+      "code": "func title(from json: [String: Any]) -> String {\n    return json[\"title\"] as! String\n}\n",
+      "expected_summary": "Forced cast (as!) of a missing JSON value can crash",
+      "bug_category": "optionals",
+      "keywords": ["force cast", "as!", "crash", "json"],
+      "good_answers": [
+        "force cast as! of missing json title can crash",
+        "as! force cast crashes when value is wrong or missing"
+      ],
+      "bad_answers": [
+        "switch not exhaustive",
+        "actor property without await"
+      ]
+    },
+    {
+      "id": "col-max-unwrap",
+      "code": "func max(of values: [Int]) -> Int {\n    return values.max()!\n}\n",
+      "expected_summary": "Force unwrap of max() on an empty array",
+      "bug_category": "collections",
+      "keywords": ["force unwrap", "empty", "max", "nil"],
+      "good_answers": [
+        "force unwrap of max on empty array",
+        "max() returns nil for empty so force unwrap crashes"
+      ],
+      "bad_answers": [
+        "missing default on switch",
+        "let struct mutation"
+      ]
+    },
+    {
+      "id": "err-throws-missing",
+      "code": "func decode(_ data: Data) -> User {\n    return try JSONDecoder().decode(User.self, from: data)\n}\n",
+      "expected_summary": "Uses try in a non-throwing function without handling the error",
+      "bug_category": "errors",
+      "keywords": ["throws", "try", "error", "decode"],
+      "good_answers": [
+        "try in a non-throwing function without error handling",
+        "decode uses try but function does not throw"
+      ],
+      "bad_answers": [
+        "optional interpolation prints Optional",
+        "class reference mistaken for value copy"
+      ]
+    }
+  ]
+}
