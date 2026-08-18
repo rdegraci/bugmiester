@@ -221,16 +221,10 @@ def test_facade_mock_round_still_works(tmp_path: Path, monkeypatch) -> None:
         assert result["points_possible"] == 10
 
 
-def test_live_providers_stubbed_except_openai_anthropic(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_all_live_providers_need_keys(tmp_path: Path, monkeypatch) -> None:
     from dataclasses import replace
 
     settings = _mock_settings(tmp_path, monkeypatch)
-    for name in ("grok",):
-        live = replace(settings, llm=replace(settings.llm, provider=name))
-        with pytest.raises(NotImplementedError):
-            generate_bug(live, used_seed_ids=set(), history=[])
 
     openai_settings = replace(settings, llm=replace(settings.llm, provider="openai"))
     from bugmiester.llm.openai_provider import OpenAIConfigError
@@ -245,3 +239,9 @@ def test_live_providers_stubbed_except_openai_anthropic(
 
     with pytest.raises(AnthropicConfigError):
         generate_bug(anthropic_settings, used_seed_ids=set(), history=[])
+
+    grok_settings = replace(settings, llm=replace(settings.llm, provider="grok"))
+    from bugmiester.llm.grok_provider import GrokConfigError
+
+    with pytest.raises(GrokConfigError):
+        generate_bug(grok_settings, used_seed_ids=set(), history=[])

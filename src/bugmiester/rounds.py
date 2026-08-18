@@ -14,6 +14,7 @@ from bugmiester.llm.anthropic_provider import (
     AnthropicConfigError,
     AnthropicRequestError,
 )
+from bugmiester.llm.grok_provider import GrokConfigError, GrokRequestError
 from bugmiester.llm.openai_provider import OpenAIConfigError, OpenAIRequestError
 from bugmiester.metrics import MetricsCollector
 from bugmiester.models import (
@@ -26,10 +27,11 @@ from bugmiester.models import (
 from bugmiester.reports import write_report
 from bugmiester.scoring import score_answer
 
-_LIVE_PROVIDERS = frozenset({"openai", "anthropic"})
+_LIVE_PROVIDERS = frozenset({"openai", "anthropic", "grok"})
 _PROVIDER_ENV = {
     "openai": "OPENAI_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
+    "grok": "GROK_API_KEY",
 }
 
 
@@ -50,7 +52,7 @@ def _assert_provider_ready(settings: Settings) -> None:
         "provider_unsupported",
         (
             f"Provider '{provider}' is not wired yet. "
-            "Set llm.provider to mock, openai, or anthropic."
+            "Set llm.provider to mock, openai, anthropic, or grok."
         ),
         status_code=503,
     )
@@ -68,9 +70,9 @@ def _judge_fn_for(settings: Settings):
 
 
 def _map_provider_error(exc: Exception) -> RoundError | None:
-    if isinstance(exc, (OpenAIConfigError, AnthropicConfigError)):
+    if isinstance(exc, (OpenAIConfigError, AnthropicConfigError, GrokConfigError)):
         return RoundError("config_not_ready", str(exc), status_code=503)
-    if isinstance(exc, (OpenAIRequestError, AnthropicRequestError)):
+    if isinstance(exc, (OpenAIRequestError, AnthropicRequestError, GrokRequestError)):
         return RoundError("llm_failed", str(exc), status_code=502)
     if isinstance(exc, NotImplementedError):
         return RoundError("provider_unsupported", str(exc), status_code=503)
