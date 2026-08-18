@@ -116,6 +116,56 @@ def _tool_input_json(blocks: Any, tool_name: str) -> str | None:
     return None
 
 
+def _omit_sampling(model: str) -> bool:
+    """Newer Claude models reject non-default temperature / top_p / top_k."""
+    name = (model or "").strip().lower().replace("_", "-")
+    return (
+        "sonnet-5" in name
+        or "opus-4-7" in name
+        or "opus-4-8" in name
+        or "opus-4.7" in name
+        or "opus-4.8" in name
+    )
+
+
+def _adaptive_thinking_default(model: str) -> bool:
+    """Sonnet 5 / newer Opus think unless the request turns it off."""
+    return _omit_sampling(model)
+
+
+def _temperature_rejected(exc: BaseException) -> bool:
+    message = str(exc).lower()
+    return "temperature" in message and (
+        "deprecated" in message
+        or "invalid_request" in message
+        or "not accepted" in message
+        or "sampling" in message
+    )
+
+
+def _messages_create(client: Any, kwargs: dict[str, Any]) -> Any:
+    try:
+        return client.messages.create(**kwargs)
+    except AnthropicConfigError:
+        raise
+    except AnthropicRequestError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        if "temperature" in kwargs and _temperature_rejected(exc):
+            retry = {key: value for key, value in kwargs.items() if key != "temperature"}
+            try:
+                return client.messages.create(**retry)
+            except AnthropicConfigError:
+                raise
+            except AnthropicRequestError:
+                raise
+            except Exception as retry_exc:  # noqa: BLE001
+                raise AnthropicRequestError(
+                    f"Anthropic request failed: {retry_exc}"
+                ) from retry_exc
+        raise
+
+
 def _messages_json(
     settings: Settings,
     *,
@@ -145,17 +195,22 @@ def _messages_json(
             "input_schema": schema,
         }
     ]
+    common: dict[str, Any] = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "system": system,
+        "messages": messages,
+        "tools": tools,
+        "tool_choice": {"type": "tool", "name": tool_name},
+    }
+    if not _omit_sampling(model):
+        common["temperature"] = temperature
+    if _adaptive_thinking_default(model):
+        # Adaptive thinking is on by default and shares max_tokens with tool JSON.
+        common["thinking"] = {"type": "disabled"}
 
     try:
-        response = client.messages.create(
-            model=model,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            system=system,
-            messages=messages,
-            tools=tools,
-            tool_choice={"type": "tool", "name": tool_name},
-        )
+        response = _messages_create(client, common)
         raw = _tool_input_json(response.content, tool_name)
         if raw and raw.strip():
             return raw
@@ -174,16 +229,20 @@ def _messages_json(
         if "tool" not in message and "tool_choice" not in message:
             raise AnthropicRequestError(f"Anthropic request failed: {exc}") from exc
 
+    plaintext: dict[str, Any] = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "system": (
+            f"{system} Reply with a single JSON object only — no markdown fences."
+        ),
+        "messages": messages,
+    }
+    if not _omit_sampling(model):
+        plaintext["temperature"] = temperature
+    if _adaptive_thinking_default(model):
+        plaintext["thinking"] = {"type": "disabled"}
     try:
-        response = client.messages.create(
-            model=model,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            system=(
-                f"{system} Reply with a single JSON object only — no markdown fences."
-            ),
-            messages=messages,
-        )
+        response = _messages_create(client, plaintext)
         text = _text_from_content(response.content)
         if not text:
             raise AnthropicRequestError("Anthropic returned empty content")
@@ -211,6 +270,7 @@ def generate_raw(prompt: str, settings: Settings) -> str:
             "Record one Swift snippet with exactly one intentional bug and its answer key."
         ),
         schema=GENERATION_JSON_SCHEMA,
+        max_tokens=4096,
     )
 
 

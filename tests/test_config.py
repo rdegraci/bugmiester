@@ -159,6 +159,8 @@ def test_load_settings_mock_always_ready(tmp_path: Path) -> None:
     assert settings.recovery.timeout_seconds == 4
     assert settings.recovery.max_llm_calls == 1
     assert settings.recovery.use_seed_bank_fallback is True
+    assert settings.freshness.shuffle_seeds is True
+    assert settings.freshness.max_category_repeats_per_round == 1
 
 
 def test_resolve_provider_key_helpers() -> None:

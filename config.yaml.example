@@ -6,7 +6,7 @@ llm:
   # Prefer a fast/cheap model for generation (10 calls/round).
   # Lock provider+model after the bakeoff (see README).
   model: gpt-4o-mini
-  temperature: 0.4
+  temperature: 0.55
   judge_temperature: 0.0
   timeout_seconds: 60
 
@@ -26,6 +26,8 @@ freshness:
   similarity_reject_threshold: 0.72
   # Total generate attempts per bug including the first (JSON repair + freshness share this)
   max_generate_attempts: 2
+  max_category_repeats_per_round: 1   # unique bug class until the pool runs out
+  shuffle_seeds: true                 # new seed order each round
 
 resilience:
   max_judge_calls_per_submit: 1

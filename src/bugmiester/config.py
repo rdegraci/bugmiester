@@ -62,6 +62,8 @@ class FreshnessSettings:
     avoid_list_max: int = 20
     similarity_reject_threshold: float = 0.72
     max_generate_attempts: int = 2
+    max_category_repeats_per_round: int = 1
+    shuffle_seeds: bool = True
 
 
 @dataclass(frozen=True)
@@ -198,6 +200,13 @@ def _parse_yaml_config(raw: Mapping[str, Any]) -> dict[str, Any]:
                 freshness_raw.get("similarity_reject_threshold", 0.72)
             ),
             max_generate_attempts=int(freshness_raw.get("max_generate_attempts", 2)),
+            max_category_repeats_per_round=_clamp_int(
+                freshness_raw.get("max_category_repeats_per_round", 1),
+                lo=1,
+                hi=5,
+                default=1,
+            ),
+            shuffle_seeds=bool(freshness_raw.get("shuffle_seeds", True)),
         ),
         "resilience": ResilienceSettings(
             max_judge_calls_per_submit=int(

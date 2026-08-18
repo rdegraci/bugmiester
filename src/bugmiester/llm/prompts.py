@@ -48,9 +48,11 @@ Task: Write a NEW {language} snippet for this scenario seed:
 
 Rules:
 - Exactly ONE intentional bug (correctness / runtime / compile-logic — not style).
+- The bug must fit this seed's category. Do not substitute a generic force-unwrap or missing await unless the category requires it.
 - No multiple interacting defects.
 - Short enough to read on one screen.
 - Do NOT reuse or near-duplicate anything on the avoid-list.
+- Do not reuse an avoid-list failure mode (for example a second force-unwrap, a second missing await, or a second empty-array crash).
 
 Avoid-list (do not reuse):
 {avoid}

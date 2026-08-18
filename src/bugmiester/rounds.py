@@ -8,7 +8,14 @@ from collections import deque
 from dataclasses import dataclass, field
 
 from bugmiester.config import Settings
-from bugmiester.freshness import GeneratedSnippet, HistoryEntry, history_entry
+from bugmiester.freshness import (
+    SEED_POOL,
+    GeneratedSnippet,
+    HistoryEntry,
+    ScenarioSeed,
+    history_entry,
+    order_seed_pool,
+)
 from bugmiester.llm import generate_bug, generate_recovery_distractors, judge_answer
 from bugmiester.llm.facade import RecoveryLlmError
 from bugmiester.llm.anthropic_provider import (
@@ -131,6 +138,7 @@ class RoundState:
     pending: StoredSnippet | None = None
     snippets: dict[str, StoredSnippet] = field(default_factory=dict)
     used_seed_ids: set[str] = field(default_factory=set)
+    seed_pool: tuple[ScenarioSeed, ...] = field(default_factory=tuple)
     complete: bool = False
 
 
@@ -149,6 +157,9 @@ class RoundStore:
             bugs_per_round=bugs,
             points_per_bug=points,
             language=settings.game.language,
+            seed_pool=order_seed_pool(
+                SEED_POOL, shuffle=settings.freshness.shuffle_seeds
+            ),
         )
         self._rounds[round_id] = state
         if settings.metrics.log_per_bug:
@@ -190,6 +201,7 @@ class RoundStore:
                 settings,
                 used_seed_ids=state.used_seed_ids,
                 history=list(self._history),
+                seed_pool=state.seed_pool or SEED_POOL,
             )
         except Exception as exc:
             mapped = _map_provider_error(exc)

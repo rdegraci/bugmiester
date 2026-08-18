@@ -7,7 +7,7 @@ import re
 import uuid
 from dataclasses import dataclass
 
-from bugmiester.llm.mock_provider import MOCK_SNIPPETS
+from bugmiester.llm.mock_provider import MOCK_SNIPPETS, SEED_SNIPPETS
 
 RECOVERY_PROMPT = (
     "Partial credit. Pick the precise bug for full points, "
@@ -67,7 +67,7 @@ def too_close_to_expected(candidate: str, expected: str) -> bool:
 def seed_bank_summaries() -> tuple[str, ...]:
     seen: set[str] = set()
     out: list[str] = []
-    for snip in MOCK_SNIPPETS:
+    for snip in (*MOCK_SNIPPETS, *SEED_SNIPPETS.values()):
         key = _normalize(snip.bug_summary)
         if key and key not in seen:
             seen.add(key)

@@ -109,6 +109,73 @@ def test_generate_and_judge_use_tool_json(tmp_path: Path, monkeypatch) -> None:
     assert second_kwargs["tool_choice"]["name"] == "bugmiester_judge"
 
 
+def test_sonnet_5_omits_temperature(tmp_path: Path, monkeypatch) -> None:
+    settings = _settings_with_anthropic(tmp_path, monkeypatch)
+    raw_yaml = yaml.safe_load(settings.config_path.read_text(encoding="utf-8"))
+    raw_yaml["llm"]["model"] = "claude-sonnet-5"
+    settings.config_path.write_text(
+        yaml.safe_dump(raw_yaml, sort_keys=False), encoding="utf-8"
+    )
+    settings = load_settings(
+        app_dir=settings.app_dir,
+        examples_dir=tmp_path / "examples",
+        load_env_into_process=False,
+    )
+
+    gen_payload = {
+        "code": "func x() { return y! }",
+        "bug_summary": "Force unwrap of y",
+        "bug_category": "optionals",
+        "difficulty": "beginner",
+        "hints": ["!"],
+        "keywords": ["force unwrap"],
+    }
+    create_mock = MagicMock(
+        return_value=_tool_response("bugmiester_generation", gen_payload)
+    )
+    client = MagicMock()
+    client.messages.create = create_mock
+    monkeypatch.setattr(
+        "bugmiester.llm.anthropic_provider._build_client",
+        lambda _settings: client,
+    )
+    generate_raw("gen prompt", settings)
+    kwargs = create_mock.call_args.kwargs
+    assert kwargs["model"] == "claude-sonnet-5"
+    assert "temperature" not in kwargs
+    assert kwargs.get("thinking") == {"type": "disabled"}
+
+
+def test_retries_without_temperature_when_api_rejects_it(
+    tmp_path: Path, monkeypatch
+) -> None:
+    settings = _settings_with_anthropic(tmp_path, monkeypatch)
+    gen_payload = {
+        "code": "func x() { return y! }",
+        "bug_summary": "Force unwrap of y",
+        "bug_category": "optionals",
+        "difficulty": "beginner",
+        "hints": ["!"],
+        "keywords": ["force unwrap"],
+    }
+
+    def _create(**kwargs):
+        if "temperature" in kwargs:
+            raise RuntimeError("`temperature` is deprecated for this model.")
+        return _tool_response("bugmiester_generation", gen_payload)
+
+    client = MagicMock()
+    client.messages.create = MagicMock(side_effect=_create)
+    monkeypatch.setattr(
+        "bugmiester.llm.anthropic_provider._build_client",
+        lambda _settings: client,
+    )
+    raw = generate_raw("gen prompt", settings)
+    assert json.loads(raw)["bug_summary"] == "Force unwrap of y"
+    assert client.messages.create.call_count == 2
+    assert "temperature" not in client.messages.create.call_args_list[1].kwargs
+
+
 def test_facade_anthropic_generate_bug(tmp_path: Path, monkeypatch) -> None:
     settings = _settings_with_anthropic(tmp_path, monkeypatch)
     gen_payload = {

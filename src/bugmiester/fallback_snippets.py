@@ -163,6 +163,128 @@ func load() async -> Int { 1 }
         hints=("load is async",),
         keywords=("await", "async", "missing"),
     ),
+    "acc-mutating-let": MockSnippet(
+        code="""\
+extension Int {
+    mutating func bump() { self += 1 }
+}
+let n = 3
+n.bump()
+""",
+        bug_summary="mutating bump() is called on a let Int",
+        bug_category="access control",
+        difficulty="beginner",
+        hints=("n is let",),
+        keywords=("mutating", "let", "Int", "method"),
+    ),
+    "acc-private-field": MockSnippet(
+        code="""\
+enum Keys {
+    private static let secret = "x"
+}
+print(Keys.secret)
+""",
+        bug_summary="private static member is read from outside the enum",
+        bug_category="access control",
+        difficulty="beginner",
+        hints=("private on Keys",),
+        keywords=("private", "static", "enum", "access"),
+    ),
+    "ui-state-let": MockSnippet(
+        code="""\
+import SwiftUI
+struct TapView: View {
+    var taps = 0
+    var body: some View {
+        Button("Tap") { taps += 1 }
+    }
+}
+""",
+        bug_summary="View body mutates stored taps; it needs @State, not a plain var",
+        bug_category="SwiftUI state",
+        difficulty="beginner",
+        hints=("Views are structs",),
+        keywords=("@State", "var", "View", "mutate"),
+    ),
+    "ui-binding-dollar": MockSnippet(
+        code="""\
+import SwiftUI
+struct SwitchRow: View {
+    @State private var enabled = false
+    var body: some View {
+        Toggle("On", isOn: enabled)
+    }
+}
+""",
+        bug_summary="Toggle needs a Binding; missing $ on enabled",
+        bug_category="SwiftUI state",
+        difficulty="beginner",
+        hints=("Use $enabled",),
+        keywords=("Binding", "$", "Toggle", "@State"),
+    ),
+    "cap-stored-self": MockSnippet(
+        code="""\
+final class Hook {
+    var handler: (() -> Void)?
+    func attach() {
+        handler = { self.fire() }
+    }
+    func fire() {}
+}
+""",
+        bug_summary="Stored handler closure captures self strongly",
+        bug_category="captures",
+        difficulty="intermediate",
+        hints=("[weak self]",),
+        keywords=("retain cycle", "self", "closure", "weak"),
+    ),
+    "cap-timer-cycle": MockSnippet(
+        code="""\
+final class Pump {
+    var again: (() -> Void)?
+    func arm() {
+        again = { self.arm() }
+    }
+}
+""",
+        bug_summary="again stores a closure that calls arm() and captures self",
+        bug_category="captures",
+        difficulty="intermediate",
+        hints=("self.arm inside again",),
+        keywords=("retain cycle", "self", "closure", "stored"),
+    ),
+    "eq-identity-id": MockSnippet(
+        code="""\
+class Row: Equatable {
+    let key: String
+    init(_ key: String) { self.key = key }
+    static func == (lhs: Row, rhs: Row) -> Bool { lhs.key == rhs.key }
+}
+func has(_ rows: [Row], _ row: Row) -> Bool {
+    rows.contains { $0 === row }
+}
+""",
+        bug_summary="contains uses === while Row equality is by key",
+        bug_category="equality",
+        difficulty="intermediate",
+        hints=("=== vs ==",),
+        keywords=("===", "==", "identity", "Equatable"),
+    ),
+    "eq-missing-protocol": MockSnippet(
+        code="""\
+class Item {
+    var sku = ""
+}
+func unique(_ items: [Item]) -> Set<Item> {
+    Set(items)
+}
+""",
+        bug_summary="Set<Item> requires Hashable; Item does not conform",
+        bug_category="equality",
+        difficulty="beginner",
+        hints=("Hashable",),
+        keywords=("Hashable", "Set", "conform", "class"),
+    ),
 }
 
 _DEFAULT_FALLBACK = MockSnippet(

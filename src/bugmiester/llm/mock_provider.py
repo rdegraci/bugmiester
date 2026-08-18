@@ -220,6 +220,135 @@ func fetchRemote() async -> String { "ok" }
         hints=("fetchRemote is async",),
         keywords=("await", "async", "missing"),
     ),
+    "acc-mutating-let": MockSnippet(
+        code="""\
+struct Counter {
+    var n = 0
+    mutating func bump() { n += 1 }
+}
+let counter = Counter()
+counter.bump()
+""",
+        bug_summary="Calling a mutating method on a let struct value is illegal",
+        bug_category="access control",
+        difficulty="beginner",
+        hints=("counter is let",),
+        keywords=("mutating", "let", "struct", "method"),
+    ),
+    "acc-private-field": MockSnippet(
+        code="""\
+struct Box {
+    private var n = 0
+}
+func reveal(_ box: Box) -> Int {
+    return box.n
+}
+""",
+        bug_summary="private stored property is read from a free function outside the type",
+        bug_category="access control",
+        difficulty="beginner",
+        hints=("private is scoped to Box",),
+        keywords=("private", "access", "property", "outside"),
+    ),
+    "ui-state-let": MockSnippet(
+        code="""\
+import SwiftUI
+struct CounterView: View {
+    let count = 0
+    var body: some View {
+        Button("Add") { count += 1 }
+    }
+}
+""",
+        bug_summary="View mutates a let; the counter should be @State",
+        bug_category="SwiftUI state",
+        difficulty="beginner",
+        hints=("@State vs let",),
+        keywords=("@State", "let", "mutate", "View"),
+    ),
+    "ui-binding-dollar": MockSnippet(
+        code="""\
+import SwiftUI
+struct NameForm: View {
+    @State private var name = ""
+    var body: some View {
+        TextField("Name", text: name)
+    }
+}
+""",
+        bug_summary="TextField needs a Binding; missing $ on name",
+        bug_category="SwiftUI state",
+        difficulty="beginner",
+        hints=("Use $name",),
+        keywords=("Binding", "$", "TextField", "@State"),
+    ),
+    "cap-stored-self": MockSnippet(
+        code="""\
+class Speaker {
+    var say: (() -> Void)?
+    func setup() {
+        say = { self.announce() }
+    }
+    func announce() { print("hi") }
+}
+""",
+        bug_summary="Escaping closure stored on self captures self strongly and forms a retain cycle",
+        bug_category="captures",
+        difficulty="intermediate",
+        hints=("[weak self]",),
+        keywords=("retain cycle", "self", "closure", "weak"),
+    ),
+    "cap-timer-cycle": MockSnippet(
+        code="""\
+class Ticker {
+    var timer: Timer?
+    var n = 0
+    func start() {
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+            self.n += 1
+        }
+    }
+}
+""",
+        bug_summary="Stored repeating Timer retains a closure that strongly captures self",
+        bug_category="captures",
+        difficulty="intermediate",
+        hints=("Timer plus self",),
+        keywords=("Timer", "retain cycle", "self", "closure"),
+    ),
+    "eq-identity-id": MockSnippet(
+        code="""\
+class User: Equatable {
+    let id: Int
+    init(id: Int) { self.id = id }
+    static func == (lhs: User, rhs: User) -> Bool { lhs.id == rhs.id }
+}
+func inList(_ users: [User], _ target: User) -> Bool {
+    users.contains { $0 === target }
+}
+""",
+        bug_summary="Uses === identity while User equality is defined by id",
+        bug_category="equality",
+        difficulty="intermediate",
+        hints=("=== vs ==",),
+        keywords=("===", "==", "identity", "Equatable"),
+    ),
+    "eq-missing-protocol": MockSnippet(
+        code="""\
+class Person {
+    var name: String
+    init(_ name: String) { self.name = name }
+}
+func sameName(_ a: Person, _ b: Person) -> Bool {
+    a == b
+}
+""",
+        bug_summary="== is used on a class that does not conform to Equatable",
+        bug_category="equality",
+        difficulty="beginner",
+        hints=("Person is not Equatable",),
+        keywords=("Equatable", "==", "class", "conform"),
+    ),
 }
 
 
@@ -404,7 +533,8 @@ class MockProvider:
             expected = expected_match.group(1).strip()
         distractors: list[str] = []
         seen = {expected.strip().lower()}
-        for snip in self._snippets:
+        bank = list(self._snippets) + list(self._seed_map.values())
+        for snip in bank:
             summary = snip.bug_summary.strip()
             key = summary.lower()
             if key in seen:

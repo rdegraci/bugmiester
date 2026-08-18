@@ -11,6 +11,8 @@ from bugmiester.freshness import (
     history_entry,
     is_too_similar,
     normalize_code,
+    order_seed_pool,
+    pick_seed,
     similarity_score,
 )
 
@@ -121,3 +123,59 @@ def test_fresh_generate_accepts_unique_mock(monkeypatch) -> None:
     assert parse_failures == 0
     assert result.code
     assert result.seed.seed_id in used
+
+
+def test_pick_seed_uses_new_category_before_repeat() -> None:
+    used: set[str] = set()
+    seen_categories: list[str] = []
+    unique_count = len({seed.category for seed in SEED_POOL})
+    for _ in range(unique_count):
+        seed = pick_seed(SEED_POOL, used, max_category_repeats=1)
+        used.add(seed.seed_id)
+        seen_categories.append(seed.category)
+    assert len(seen_categories) == len(set(seen_categories))
+
+    extra = pick_seed(SEED_POOL, used, max_category_repeats=1)
+    assert extra.seed_id not in used
+    assert extra.category in seen_categories
+
+
+def test_order_seed_pool_shuffle_changes_order() -> None:
+    import random
+
+    random.seed(1)
+    shuffled = order_seed_pool(SEED_POOL, shuffle=True)
+    random.seed(1)
+    shuffled_again = order_seed_pool(SEED_POOL, shuffle=True)
+    frozen = order_seed_pool(SEED_POOL, shuffle=False)
+    assert shuffled == shuffled_again
+    assert frozen == SEED_POOL
+    assert {s.seed_id for s in shuffled} == {s.seed_id for s in SEED_POOL}
+
+
+def test_seed_pool_has_ten_categories_wired_to_mock_and_fallback() -> None:
+    from bugmiester.fallback_snippets import fallback_for_seed
+    from bugmiester.llm.mock_provider import SEED_SNIPPETS
+
+    categories = {seed.category for seed in SEED_POOL}
+    assert categories >= {
+        "optionals",
+        "collections",
+        "value vs reference",
+        "control flow",
+        "errors",
+        "concurrency",
+        "access control",
+        "SwiftUI state",
+        "captures",
+        "equality",
+    }
+    assert len(categories) == 10
+    for seed in SEED_POOL:
+        assert seed.seed_id in SEED_SNIPPETS
+        mock = SEED_SNIPPETS[seed.seed_id]
+        assert mock.bug_category == seed.category
+        fallback = fallback_for_seed(seed)
+        assert fallback.bug_category == seed.category
+        assert fallback.code != mock.code
+        assert fallback.bug_summary != mock.bug_summary

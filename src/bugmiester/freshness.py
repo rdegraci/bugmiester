@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import difflib
+import random
 import re
+from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
@@ -25,7 +27,7 @@ class ScenarioSeed:
         return base
 
 
-# Curated pool — at least one distinct seed per bug in a default round of 10.
+# Curated pool — ten categories so a 10-bug round can skip class repeats.
 SEED_POOL: tuple[ScenarioSeed, ...] = (
     ScenarioSeed("opt-dict-force", "optionals", "dictionary lookup"),
     ScenarioSeed("col-empty-avg", "collections", "empty array average"),
@@ -39,6 +41,14 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
     ScenarioSeed("val-let-struct", "value vs reference", "immutable point"),
     ScenarioSeed("opt-array-first", "optionals", "first element access"),
     ScenarioSeed("conc-await-miss", "concurrency", "missing await on async call"),
+    ScenarioSeed("acc-mutating-let", "access control", "mutating method on a let value"),
+    ScenarioSeed("acc-private-field", "access control", "private property from a free function"),
+    ScenarioSeed("ui-state-let", "SwiftUI state", "counter button stored as let"),
+    ScenarioSeed("ui-binding-dollar", "SwiftUI state", "TextField missing binding prefix"),
+    ScenarioSeed("cap-stored-self", "captures", "escaping closure stored on self"),
+    ScenarioSeed("cap-timer-cycle", "captures", "repeating timer owned by self"),
+    ScenarioSeed("eq-identity-id", "equality", "identity used instead of id equality"),
+    ScenarioSeed("eq-missing-protocol", "equality", "class compared with == but not Equatable"),
 )
 
 
@@ -146,16 +156,43 @@ def build_avoid_list(
     return list(history[-max_items:])
 
 
+def order_seed_pool(
+    pool: Sequence[ScenarioSeed],
+    *,
+    shuffle: bool,
+) -> tuple[ScenarioSeed, ...]:
+    """Copy of the seed pool, optionally shuffled for this round."""
+    items = list(pool)
+    if shuffle:
+        random.shuffle(items)
+    return tuple(items)
+
+
 def pick_seed(
     pool: Sequence[ScenarioSeed],
     used_seed_ids: set[str],
+    *,
+    max_category_repeats: int = 1,
 ) -> ScenarioSeed:
-    for seed in pool:
-        if seed.seed_id not in used_seed_ids:
-            return seed
-    # Pool exhausted within the round — reuse least-recent by cycling.
+    """
+    Next unused seed, preferring categories still under the per-round cap.
+
+    After every category has been used ``max_category_repeats`` times, unused
+    seeds in already-seen categories are allowed so a 10-bug round can finish.
+    """
     if not pool:
         raise ValueError("SEED_POOL is empty")
+    cap = max(1, max_category_repeats)
+    used_seeds = [seed for seed in pool if seed.seed_id in used_seed_ids]
+    category_counts = Counter(seed.category for seed in used_seeds)
+    unused = [seed for seed in pool if seed.seed_id not in used_seed_ids]
+    under_cap = [
+        seed for seed in unused if category_counts[seed.category] < cap
+    ]
+    if under_cap:
+        return under_cap[0]
+    if unused:
+        return unused[0]
     return pool[len(used_seed_ids) % len(pool)]
 
 
@@ -173,6 +210,7 @@ def generate_with_freshness(
     similarity_threshold: float = 0.72,
     avoid_list_max: int = 20,
     use_fallback: bool = True,
+    max_category_repeats: int = 1,
     generate_fn: GenerateFn | None = None,
     generate_raw_fn: RawGenerateFn | None = None,
     fallback_fn: FallbackFn,
@@ -192,7 +230,11 @@ def generate_with_freshness(
     if generate_raw_fn is not None and parse_raw is None:
         raise ValueError("parse_raw is required when using generate_raw_fn")
 
-    seed = pick_seed(seed_pool, used_seed_ids)
+    seed = pick_seed(
+        seed_pool,
+        used_seed_ids,
+        max_category_repeats=max_category_repeats,
+    )
     used_seed_ids.add(seed.seed_id)
     avoid = build_avoid_list(history, max_items=avoid_list_max)
 

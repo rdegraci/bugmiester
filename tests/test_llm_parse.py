@@ -64,6 +64,7 @@ def test_prompts_include_seed_and_avoid_list() -> None:
     avoid = []
     prompt = build_generation_prompt(seed, avoid)
     assert "Exactly ONE intentional bug" in prompt
+    assert "failure mode" in prompt
     assert seed.seed_id in prompt
     assert "bug_summary" in prompt
 
