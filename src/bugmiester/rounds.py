@@ -29,6 +29,7 @@ from bugmiester.models import (
     NextBugResponse,
     ReportSnippetResponse,
     RecoveryChoice,
+    RoundResumeResponse,
     RoundStartResponse,
     RoundSummary,
     SubmitResponse,
@@ -127,6 +128,7 @@ class StoredSnippet:
     reported: bool = False
     recovery_open: bool = False
     recovery_options: tuple[RecoveryOption, ...] = ()
+    feedback: str = ""
 
 
 @dataclass
@@ -248,7 +250,110 @@ class RoundStore:
             )
         return NextBugResponse(
             round_id=round_id,
-            index=state.index,
+            index=stored.index,
+            bugs_per_round=state.bugs_per_round,
+            snippet_id=stored.snippet_id,
+            language=stored.language,
+            code=stored.code,
+            difficulty=stored.difficulty,
+            degraded=stored.degraded,
+        )
+
+    def resume(
+        self, round_id: str, snippet_id: str | None = None
+    ) -> RoundResumeResponse:
+        """Restore a playable view of an in-memory round (no unanswered key)."""
+        state = self._require(round_id)
+        requested = (snippet_id or "").strip()
+        target: StoredSnippet | None = None
+        if requested:
+            target = state.snippets.get(requested)
+            if target is None:
+                raise RoundError(
+                    "unknown_snippet", "Unknown snippet_id", status_code=404
+                )
+        elif state.pending is not None:
+            target = state.pending
+        elif state.snippets:
+            target = max(state.snippets.values(), key=lambda item: item.index)
+
+        pending_public: NextBugResponse | None = None
+        if (
+            state.pending is not None
+            and not state.pending.answered
+            and (target is None or state.pending.snippet_id != target.snippet_id)
+        ):
+            pending_public = self._public_bug(state, state.pending)
+
+        if target is None:
+            return RoundResumeResponse(
+                round_id=round_id,
+                bugs_per_round=state.bugs_per_round,
+                round_score=state.round_score,
+                round_possible=state.bugs_per_round * state.points_per_bug,
+                index=0,
+                round_complete=state.complete,
+                pending=pending_public,
+                summary=self._summary_if_complete(state, state.complete),
+            )
+
+        recovery = bool(target.recovery_open)
+        answered = bool(target.answered)
+        feedback = ""
+        expected = ""
+        if answered:
+            feedback = target.feedback or ""
+            if recovery:
+                feedback = strip_expected_from_feedback(
+                    feedback, target.bug_summary
+                )
+            else:
+                expected = target.bug_summary
+                if not feedback:
+                    if target.correct:
+                        feedback = "Yes."
+                    elif target.partial:
+                        feedback = "Partially correct."
+                    else:
+                        feedback = "Not quite."
+
+        return RoundResumeResponse(
+            round_id=round_id,
+            bugs_per_round=state.bugs_per_round,
+            round_score=state.round_score,
+            round_possible=state.bugs_per_round * state.points_per_bug,
+            index=target.index,
+            round_complete=state.complete,
+            snippet_id=target.snippet_id,
+            language=target.language,
+            code=target.code,
+            difficulty=target.difficulty,
+            degraded=target.degraded,
+            answered=answered,
+            player_answer=target.player_answer if answered else "",
+            correct=target.correct if answered else None,
+            partial=target.partial if answered else None,
+            points_awarded=target.points_awarded if answered else None,
+            points_possible=target.points_possible if answered else None,
+            feedback=feedback,
+            expected_summary=expected,
+            recovery_available=recovery,
+            recovery_prompt=RECOVERY_PROMPT if recovery else "",
+            recovery_options=[
+                RecoveryChoice(id=item["id"], text=item["text"])
+                for item in public_choices(list(target.recovery_options))
+            ]
+            if recovery
+            else [],
+            reported=bool(target.reported) if answered else False,
+            summary=self._summary_if_complete(state, state.complete),
+            pending=pending_public,
+        )
+
+    def _public_bug(self, state: RoundState, stored: StoredSnippet) -> NextBugResponse:
+        return NextBugResponse(
+            round_id=state.round_id,
+            index=stored.index,
             bugs_per_round=state.bugs_per_round,
             snippet_id=stored.snippet_id,
             language=stored.language,
@@ -363,6 +468,7 @@ class RoundStore:
         stored.answered = True
         stored.recovery_open = offer_recovery
         stored.recovery_options = tuple(recovery_options)
+        stored.feedback = scored.feedback
 
         state.round_score += scored.points_awarded
         if scored.correct:
@@ -464,6 +570,8 @@ class RoundStore:
             feedback = "Not quite."
         else:
             feedback = "Kept partial credit."
+
+        stored.feedback = feedback
 
         if settings.metrics.log_per_bug:
             self.metrics.record_recovery(

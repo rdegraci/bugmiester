@@ -12,7 +12,12 @@ from fastapi.staticfiles import StaticFiles
 
 from bugmiester.analyze import analyze, get_summary
 from bugmiester.config import Settings, default_examples_dir, load_settings
-from bugmiester.models import NextBugRequest, ReportSnippetRequest, RecoverRequest, SubmitRequest
+from bugmiester.models import (
+    NextBugRequest,
+    RecoverRequest,
+    ReportSnippetRequest,
+    SubmitRequest,
+)
 from bugmiester.reports import list_reports, load_report
 from bugmiester.rounds import RoundError, RoundStore
 
@@ -169,6 +174,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 status_code=exc.status_code,
                 detail={"message": exc.message, "code": exc.code},
             ) from exc
+
+    @app.get("/api/round/{round_id}")
+    def api_round_resume(
+        round_id: str, snippet_id: str | None = Query(default=None)
+    ) -> dict:
+        store: RoundStore = app.state.rounds
+        try:
+            data = store.resume(round_id, snippet_id).model_dump()
+        except RoundError as exc:
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail={"message": exc.message, "code": exc.code},
+            ) from exc
+        for key in ("bug_summary", "bug_category", "hints", "keywords"):
+            data.pop(key, None)
+        for option in data.get("recovery_options") or []:
+            if isinstance(option, dict):
+                option.pop("correct", None)
+        pending = data.get("pending")
+        if isinstance(pending, dict):
+            for key in ("bug_summary", "bug_category", "hints", "keywords"):
+                pending.pop(key, None)
+        return data
 
     @app.get("/api/round/{round_id}/summary")
     def api_round_summary(round_id: str) -> dict:

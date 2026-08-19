@@ -85,5 +85,35 @@ class ReportSnippetResponse(BaseModel):
     ok: bool = True
 
 
+class RoundResumeResponse(BaseModel):
+    """Current playable round view. No answer key until the snippet is scored."""
+
+    round_id: str
+    bugs_per_round: int
+    round_score: int
+    round_possible: int
+    index: int
+    round_complete: bool
+    snippet_id: str | None = None
+    language: str = "swift"
+    code: str = ""
+    difficulty: str = ""
+    degraded: bool = False
+    answered: bool = False
+    player_answer: str = ""
+    correct: bool | None = None
+    partial: bool | None = None
+    points_awarded: int | None = None
+    points_possible: int | None = None
+    feedback: str = ""
+    expected_summary: str = ""
+    recovery_available: bool = False
+    recovery_prompt: str = ""
+    recovery_options: list[RecoveryChoice] = Field(default_factory=list)
+    reported: bool = False
+    summary: RoundSummary | None = None
+    pending: NextBugResponse | None = None
+
+
 def model_dump(obj: BaseModel) -> dict[str, Any]:
     return obj.model_dump()

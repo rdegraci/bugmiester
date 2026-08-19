@@ -98,6 +98,94 @@ def test_full_mock_round_no_answer_key_leak(tmp_path: Path, monkeypatch) -> None
         assert blocked.status_code == 400
 
 
+def test_resume_round_after_ops_navigation(tmp_path: Path, monkeypatch) -> None:
+    settings = _mock_settings(tmp_path, monkeypatch)
+    app = create_app(settings=settings)
+    with TestClient(app) as client:
+        round_id = client.post("/api/round/start").json()["round_id"]
+        empty = client.get(f"/api/round/{round_id}").json()
+        assert empty["snippet_id"] is None
+        assert empty["expected_summary"] == ""
+        assert "bug_summary" not in empty
+
+        bug = client.post(
+            "/api/round/next-bug", json={"round_id": round_id}
+        ).json()
+        live = client.get(f"/api/round/{round_id}").json()
+        assert live["snippet_id"] == bug["snippet_id"]
+        assert live["code"] == bug["code"]
+        assert live["answered"] is False
+        assert live["expected_summary"] == ""
+        assert live["feedback"] == ""
+        assert "bug_summary" not in live
+        assert "hints" not in live
+        assert "keywords" not in live
+        assert "bug_category" not in live
+
+        submitted = client.post(
+            "/api/round/submit",
+            json={
+                "round_id": round_id,
+                "snippet_id": bug["snippet_id"],
+                "answer": "css grid stylesheet overflow python gil deadlock",
+            },
+        ).json()
+        if submitted.get("recovery_available"):
+            restored = client.get(
+                f"/api/round/{round_id}",
+                params={"snippet_id": bug["snippet_id"]},
+            ).json()
+            assert restored["answered"] is True
+            assert restored["recovery_available"] is True
+            assert restored["expected_summary"] == ""
+            assert restored["recovery_options"]
+            for option in restored["recovery_options"]:
+                assert "correct" not in option
+            client.post(
+                "/api/round/recover",
+                json={
+                    "round_id": round_id,
+                    "snippet_id": bug["snippet_id"],
+                    "option_id": None,
+                },
+            )
+
+        scored = client.get(
+            f"/api/round/{round_id}",
+            params={"snippet_id": bug["snippet_id"]},
+        ).json()
+        assert scored["answered"] is True
+        assert scored["expected_summary"]
+        assert scored["player_answer"]
+        assert "bug_summary" not in scored
+
+        nxt = client.post(
+            "/api/round/next-bug", json={"round_id": round_id}
+        ).json()
+        with_pending = client.get(
+            f"/api/round/{round_id}",
+            params={"snippet_id": bug["snippet_id"]},
+        ).json()
+        assert with_pending["snippet_id"] == bug["snippet_id"]
+        assert with_pending["answered"] is True
+        assert with_pending["pending"] is not None
+        assert with_pending["pending"]["snippet_id"] == nxt["snippet_id"]
+        assert "bug_summary" not in with_pending["pending"]
+
+        missing = client.get("/api/round/not-a-round")
+        assert missing.status_code == 404
+
+
+def test_game_js_restores_round_from_session(tmp_path: Path, monkeypatch) -> None:
+    settings = _mock_settings(tmp_path, monkeypatch)
+    app = create_app(settings=settings)
+    with TestClient(app) as client:
+        js = client.get("/app.js").text
+    assert "sessionStorage" in js
+    assert "bugmiester.activeRound" in js
+    assert "/api/round/" in js
+
+
 def _play_mock_round(client: TestClient) -> list[str]:
     round_id = client.post("/api/round/start").json()["round_id"]
     codes: list[str] = []

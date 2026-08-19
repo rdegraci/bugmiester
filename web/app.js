@@ -36,6 +36,8 @@
     roundCompleteModal: document.getElementById("round-complete-modal"),
   };
 
+  const SESSION_KEY = "bugmiester.activeRound";
+
   const state = {
     busy: false,
     hasFeedback: false,
@@ -345,6 +347,131 @@
     return data;
   }
 
+  function persistSession() {
+    if (!state.roundId) {
+      clearSession();
+      return;
+    }
+    try {
+      window.sessionStorage.setItem(
+        SESSION_KEY,
+        JSON.stringify({
+          roundId: state.roundId,
+          snippetId: state.snippetId,
+          answer: els.answerInput ? els.answerInput.value : "",
+        })
+      );
+    } catch (_err) {
+      // Private mode / blocked storage — round is still in server memory.
+    }
+  }
+
+  function loadSession() {
+    try {
+      const raw = window.sessionStorage.getItem(SESSION_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed.roundId !== "string" || !parsed.roundId) {
+        return null;
+      }
+      return parsed;
+    } catch (_err) {
+      return null;
+    }
+  }
+
+  function clearSession() {
+    try {
+      window.sessionStorage.removeItem(SESSION_KEY);
+    } catch (_err) {
+      // ignore
+    }
+  }
+
+  function applyResume(live, snap) {
+    state.roundId = live.round_id;
+    state.roundComplete = Boolean(live.round_complete);
+    state.snippetId = live.snippet_id || null;
+    updateRoundChrome(live);
+
+    const pending = live.pending;
+    if (
+      pending &&
+      pending.snippet_id &&
+      pending.snippet_id !== live.snippet_id
+    ) {
+      state.prefetch.bug = pending;
+      state.prefetch.roundId = live.round_id;
+      state.prefetch.error = null;
+      state.prefetch.inFlight = false;
+      state.prefetch.promise = null;
+      state.nextBugNumber =
+        (typeof pending.index === "number" ? pending.index : 0) + 1;
+    } else {
+      invalidatePrefetch();
+      state.nextBugNumber =
+        (typeof live.index === "number" ? live.index : 0) + 2;
+    }
+
+    if (!live.snippet_id) {
+      setCode("Start a round to load a Swift snippet.");
+      els.answerInput.value = "";
+      clearFeedback();
+      setDegraded(false);
+      persistSession();
+      setProgress("");
+      setBusy(false);
+      return;
+    }
+
+    setCode(live.code || "");
+    setDegraded(Boolean(live.degraded));
+    if (live.answered) {
+      els.answerInput.value = live.player_answer || "";
+      showFeedback(live);
+      state.reportedCurrent = Boolean(live.reported);
+      if (live.round_complete) {
+        els.btnNext.disabled = true;
+      } else if (state.prefetch.bug) {
+        setProgress(
+          `Bug ${state.nextBugNumber}/${bugsPerRound()} ready`,
+          false
+        );
+      } else {
+        setProgress("");
+      }
+    } else {
+      els.answerInput.value = (snap && snap.answer) || "";
+      clearFeedback();
+      setProgress("");
+    }
+    persistSession();
+    setBusy(false);
+    onAnswerInput();
+  }
+
+  async function restoreSession() {
+    const snap = loadSession();
+    if (!snap) return;
+    setBusy(true);
+    setProgress("Restoring round…", true);
+    try {
+      const query = snap.snippetId
+        ? `?snippet_id=${encodeURIComponent(snap.snippetId)}`
+        : "";
+      const live = await api(
+        `/api/round/${encodeURIComponent(snap.roundId)}${query}`
+      );
+      applyResume(live, snap);
+    } catch (err) {
+      if (err && err.status === 404) {
+        clearSession();
+      }
+      setProgress("");
+      setBusy(false);
+    }
+  }
+
   function applyBug(bug) {
     const n = state.nextBugNumber;
     state.snippetId = bug.snippet_id;
@@ -360,6 +487,7 @@
     clearFeedback();
     setProgress("");
     setBusy(false);
+    persistSession();
   }
 
   async function requestNextBug(showProgress) {
@@ -486,6 +614,7 @@
         body: "{}",
       });
       state.roundId = started.round_id;
+      persistSession();
       updateRoundChrome(started);
       els.bugIndex.textContent = "0";
       await fetchNextBug();
@@ -518,6 +647,7 @@
       updateRoundChrome(result);
       showFeedback(result);
       state.roundComplete = Boolean(result.round_complete);
+      persistSession();
       setProgress("", false);
       setBusy(false);
       if (result.round_complete) {
@@ -582,6 +712,7 @@
       updateRoundChrome(result);
       showFeedback(result);
       state.roundComplete = Boolean(result.round_complete);
+      persistSession();
       setProgress("", false);
       setBusy(false);
       if (result.round_complete) {
@@ -680,6 +811,7 @@
       Boolean(state.snippetId) && !state.hasFeedback && !state.roundComplete;
     els.btnSubmit.disabled =
       state.busy || !answering || !els.answerInput.value.trim();
+    persistSession();
   }
 
   els.btnStart.addEventListener("click", onStart);
@@ -716,5 +848,5 @@
   setDegraded(false);
   setBusy(false);
   els.answerInput.disabled = true;
-  probeHealth();
+  probeHealth().then(restoreSession);
 })();
