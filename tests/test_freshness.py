@@ -153,7 +153,7 @@ def test_order_seed_pool_shuffle_changes_order() -> None:
     assert {s.seed_id for s in shuffled} == {s.seed_id for s in SEED_POOL}
 
 
-def test_seed_pool_has_sixteen_categories_wired_to_mock_and_fallback() -> None:
+def test_seed_pool_has_thirty_categories_wired_to_mock_and_fallback() -> None:
     from bugmiester.fallback_snippets import fallback_for_seed
     from bugmiester.llm.mock_provider import SEED_SNIPPETS
 
@@ -175,9 +175,23 @@ def test_seed_pool_has_sixteen_categories_wired_to_mock_and_fallback() -> None:
         "lazy",
         "protocol witnesses",
         "result",
+        "type casting",
+        "failable init",
+        "inout / COW",
+        "enums",
+        "defer",
+        "unowned",
+        "some vs any",
+        "autoclosure",
+        "default arguments",
+        "MainActor",
+        "Task cancellation",
+        "actor reentrancy",
+        "SwiftUI environment",
+        "Sequence slices",
     }
-    assert len(categories) == 16
-    assert len(SEED_POOL) == 32
+    assert len(categories) == 30
+    assert len(SEED_POOL) == 60
     for seed in SEED_POOL:
         assert seed.seed_id in SEED_SNIPPETS
         mock = SEED_SNIPPETS[seed.seed_id]

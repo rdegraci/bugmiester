@@ -27,7 +27,7 @@ class ScenarioSeed:
         return base
 
 
-# Curated pool — 16 categories so a 10-bug round can skip class repeats
+# Curated pool — 30 categories so a 10-bug round can skip class repeats
 # and later rounds still have unused classes.
 SEED_POOL: tuple[ScenarioSeed, ...] = (
     ScenarioSeed("opt-dict-force", "optionals", "dictionary lookup"),
@@ -121,6 +121,174 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
         "result",
         "try used on Result.get without throws",
         "must call Result.get",
+    ),
+    ScenarioSeed(
+        "cast-any-force",
+        "type casting",
+        "Any downcast with as!",
+        "must involve as!; not a dictionary force unwrap",
+    ),
+    ScenarioSeed(
+        "cast-array-wrong",
+        "type casting",
+        "array forced to the wrong element type",
+        "must be a wrong as! on a collection",
+    ),
+    ScenarioSeed(
+        "init-url-force",
+        "failable init",
+        "URL(string:) force unwrapped",
+        "must involve a failable init, not a dictionary lookup",
+    ),
+    ScenarioSeed(
+        "init-int-force",
+        "failable init",
+        "Int(String) force unwrapped",
+        "must use a failable numeric init",
+    ),
+    ScenarioSeed(
+        "inout-local-copy",
+        "inout / COW",
+        "mutates a local copy instead of inout",
+        "must involve inout or a missed mutation",
+    ),
+    ScenarioSeed(
+        "cow-iterate-mutate",
+        "inout / COW",
+        "array mutated while iterating",
+        "must mutate a collection during for-in",
+    ),
+    ScenarioSeed(
+        "enum-if-case-wrong",
+        "enums",
+        "if case binds the wrong associated value",
+        "must involve enum associated values; no Result.get",
+    ),
+    ScenarioSeed(
+        "enum-switch-assoc",
+        "enums",
+        "switch ignores associated payload",
+        "must switch on an enum with associated values",
+    ),
+    ScenarioSeed(
+        "defer-after-return",
+        "defer",
+        "cleanup placed after return",
+        "must involve defer or unreachable cleanup",
+    ),
+    ScenarioSeed(
+        "defer-stale-copy",
+        "defer",
+        "defer captures a value copied too early",
+        "must involve defer reading a stale copy",
+    ),
+    ScenarioSeed(
+        "unowned-self-gone",
+        "unowned",
+        "unowned self used after the owner is released",
+        "must use unowned; not a retain cycle",
+    ),
+    ScenarioSeed(
+        "unowned-not-weak",
+        "unowned",
+        "unowned where the reference can be nil",
+        "must be unowned vs weak; no Timer retain cycle",
+    ),
+    ScenarioSeed(
+        "some-any-assoc",
+        "some vs any",
+        "protocol with associatedtype used as a type",
+        "must involve some/any or Self requirements",
+    ),
+    ScenarioSeed(
+        "some-return-mismatch",
+        "some vs any",
+        "opaque return hides two different concrete types",
+        "must involve some; not SwiftUI Binding",
+    ),
+    ScenarioSeed(
+        "auto-store-nonescaping",
+        "autoclosure",
+        "non-escaping autoclosure stored for later",
+        "must involve @autoclosure",
+    ),
+    ScenarioSeed(
+        "auto-eval-twice",
+        "autoclosure",
+        "autoclosure side effect runs more than once",
+        "must evaluate an autoclosure twice",
+    ),
+    ScenarioSeed(
+        "default-instance-member",
+        "default arguments",
+        "instance property used as a default argument",
+        "must be a default argument using self or an instance member",
+    ),
+    ScenarioSeed(
+        "default-proto-extension",
+        "default arguments",
+        "protocol extension default is a different function",
+        "must involve a protocol requirement vs extension default",
+    ),
+    ScenarioSeed(
+        "main-task-ui",
+        "MainActor",
+        "UI updated from an unstructured Task",
+        "must involve MainActor or UI off the main actor; not missing await",
+    ),
+    ScenarioSeed(
+        "main-callback-label",
+        "MainActor",
+        "URLSession callback writes a UILabel",
+        "must hop to the main actor; not Sendable",
+    ),
+    ScenarioSeed(
+        "cancel-ignore-flag",
+        "Task cancellation",
+        "loop ignores Task.isCancelled",
+        "must involve Task cancellation; not missing await",
+    ),
+    ScenarioSeed(
+        "cancel-no-check",
+        "Task cancellation",
+        "throwing loop skips checkCancellation",
+        "must call or omit Task.checkCancellation",
+    ),
+    ScenarioSeed(
+        "actor-await-stale",
+        "actor reentrancy",
+        "actor state used after await is stale",
+        "must await inside an actor then use prior state",
+    ),
+    ScenarioSeed(
+        "actor-await-balance",
+        "actor reentrancy",
+        "withdraw awaits then deducts a stale balance",
+        "must be actor reentrancy; not a missing await",
+    ),
+    ScenarioSeed(
+        "ui-env-missing",
+        "SwiftUI environment",
+        "EnvironmentObject used without injection",
+        "must involve environmentObject; not $ Binding",
+    ),
+    ScenarioSeed(
+        "ui-observable-state",
+        "SwiftUI environment",
+        "shared model stored as @State instead of environment",
+        "must involve @Observable or environment; not TextField $",
+    ),
+    ScenarioSeed(
+        "slice-index-zero",
+        "Sequence slices",
+        "ArraySlice indexed from 0",
+        "must index a slice; not String.Index",
+    ),
+    ScenarioSeed(
+        "slice-drop-first",
+        "Sequence slices",
+        "dropFirst slice then uses [0]",
+        "must use a slice after dropFirst or suffix",
     ),
 )
 

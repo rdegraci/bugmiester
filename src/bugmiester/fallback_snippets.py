@@ -466,6 +466,415 @@ func value(_ result: Result<Int, Error>) -> Int {
         hints=("Need try",),
         keywords=("Result", "get", "try", "throws"),
     ),
+    "cast-any-force": MockSnippet(
+        code="""\
+func asString(_ value: Any) -> String {
+    return value as! String
+}
+""",
+        bug_summary="Forced as! String crashes when value is another type",
+        bug_category="type casting",
+        difficulty="beginner",
+        hints=("as? String",),
+        keywords=("as!", "String", "Any", "cast"),
+    ),
+    "cast-array-wrong": MockSnippet(
+        code="""\
+func ns(_ values: [Any]) -> [NSNumber] {
+    return values as! [NSNumber]
+}
+""",
+        bug_summary="Forced [NSNumber] cast fails if the array is not all NSNumber",
+        bug_category="type casting",
+        difficulty="beginner",
+        hints=("compactMap",),
+        keywords=("as!", "NSNumber", "array", "cast"),
+    ),
+    "init-url-force": MockSnippet(
+        code="""\
+func file(_ path: String) -> URL {
+    return URL(string: "file://" + path)!
+}
+""",
+        bug_summary="Building a file URL with URL(string:)! still crashes if the string is invalid",
+        bug_category="failable init",
+        difficulty="beginner",
+        hints=("URL(fileURLWithPath:)",),
+        keywords=("URL", "string", "failable", "file"),
+    ),
+    "init-int-force": MockSnippet(
+        code="""\
+func score(from raw: String) -> Double {
+    return Double(raw)!
+}
+""",
+        bug_summary="Double(String) is failable; force unwrap crashes on junk text",
+        bug_category="failable init",
+        difficulty="beginner",
+        hints=("Double(raw) is Optional",),
+        keywords=("Double", "String", "failable", "unwrap"),
+    ),
+    "inout-local-copy": MockSnippet(
+        code="""\
+func clear(_ items: [String]) {
+    var items = items
+    items.removeAll()
+}
+""",
+        bug_summary="removeAll mutates a local copy of the array, not the caller's value",
+        bug_category="inout / COW",
+        difficulty="beginner",
+        hints=("inout [String]",),
+        keywords=("inout", "copy", "removeAll", "array"),
+    ),
+    "cow-iterate-mutate": MockSnippet(
+        code="""\
+func dropOdds(_ items: inout [Int]) {
+    for (i, n) in items.enumerated() {
+        if n % 2 == 1 {
+            items.remove(at: i)
+        }
+    }
+}
+""",
+        bug_summary="remove(at:) while enumerated() walks items shifts indices and can trap",
+        bug_category="inout / COW",
+        difficulty="intermediate",
+        hints=("Filter into a new array",),
+        keywords=("remove", "enumerated", "mutate", "indices"),
+    ),
+    "enum-if-case-wrong": MockSnippet(
+        code="""\
+enum Slot { case ready(Int), idle }
+func value(_ slot: Slot) -> Int {
+    guard case .ready = slot else { return 0 }
+    return 1
+}
+""",
+        bug_summary="guard case .ready does not unwrap the Int payload so the function returns 1 not the value",
+        bug_category="enums",
+        difficulty="beginner",
+        hints=("case .ready(let n)",),
+        keywords=("enum", "guard case", "payload", "Int"),
+    ),
+    "enum-switch-assoc": MockSnippet(
+        code="""\
+enum Event { case ping(String), pong }
+func name(_ event: Event) -> String {
+    switch event {
+    case .ping:
+        return "ping"
+    case .pong:
+        return "pong"
+    }
+}
+""",
+        bug_summary="case .ping drops the associated String and always returns the label ping",
+        bug_category="enums",
+        difficulty="beginner",
+        hints=("case .ping(let s)",),
+        keywords=("enum", "switch", "associated", "String"),
+    ),
+    "defer-after-return": MockSnippet(
+        code="""\
+final class Latch {
+    var held = false
+    func lock() { held = true }
+    func unlock() { held = false }
+}
+func unlock(_ latch: Latch, _ n: Int) -> Int {
+    latch.lock()
+    return n
+    latch.unlock()
+}
+""",
+        bug_summary="unlock() after return never runs so the latch stays held",
+        bug_category="defer",
+        difficulty="beginner",
+        hints=("defer { latch.unlock() }",),
+        keywords=("return", "unlock", "latch", "defer"),
+    ),
+    "defer-stale-copy": MockSnippet(
+        code="""\
+func next(_ n: Int) -> Int {
+    var n = n
+    defer { print("leaving", n) }
+    return n + 1
+}
+""",
+        bug_summary="defer prints n after the return is computed; it still shows the old n because n + 1 was not stored",
+        bug_category="defer",
+        difficulty="intermediate",
+        hints=("Assign n += 1 before return",),
+        keywords=("defer", "print", "return", "n"),
+    ),
+    "unowned-self-gone": MockSnippet(
+        code="""\
+class Client {
+    var onOK: (() -> Void)?
+    func arm() {
+        onOK = { [unowned self] in print(self) }
+    }
+}
+""",
+        bug_summary="unowned self in onOK crashes if the callback fires after Client is freed",
+        bug_category="unowned",
+        difficulty="intermediate",
+        hints=("[weak self]",),
+        keywords=("unowned", "callback", "crash", "self"),
+    ),
+    "unowned-not-weak": MockSnippet(
+        code="""\
+class Child {
+    unowned var owner: Parent
+    init(owner: Parent) { self.owner = owner }
+}
+class Parent {
+    var child: Child?
+}
+""",
+        bug_summary="unowned owner crashes if Parent can outlive or nil-out the relationship unsafely; Child requires a living Parent",
+        bug_category="unowned",
+        difficulty="intermediate",
+        hints=("weak var owner",),
+        keywords=("unowned", "owner", "Parent", "weak"),
+    ),
+    "some-any-assoc": MockSnippet(
+        code="""\
+protocol Box { associatedtype Value }
+func dump(_ box: Box) {
+    print(box)
+}
+""",
+        bug_summary="Box has associatedtype Value so it cannot be a parameter type without any or generics",
+        bug_category="some vs any",
+        difficulty="intermediate",
+        hints=("any Box",),
+        keywords=("associatedtype", "any", "protocol", "Box"),
+    ),
+    "some-return-mismatch": MockSnippet(
+        code="""\
+protocol Pet {}
+struct Cat: Pet {}
+struct Dog: Pet {}
+func pet(flag: Bool) -> some Pet {
+    flag ? Cat() : Dog()
+}
+""",
+        bug_summary="Ternary of Cat and Dog is not one concrete type for some Pet",
+        bug_category="some vs any",
+        difficulty="intermediate",
+        hints=("any Pet",),
+        keywords=("some", "ternary", "Pet", "opaque"),
+    ),
+    "auto-store-nonescaping": MockSnippet(
+        code="""\
+final class Holder {
+    var block: () -> String = { "" }
+    func take(_ text: @autoclosure () -> String) {
+        block = text
+    }
+}
+""",
+        bug_summary="take cannot assign a non-escaping autoclosure to the stored block property",
+        bug_category="autoclosure",
+        difficulty="intermediate",
+        hints=("@escaping @autoclosure",),
+        keywords=("autoclosure", "stored", "escaping", "block"),
+    ),
+    "auto-eval-twice": MockSnippet(
+        code="""\
+func assertOK(_ test: @autoclosure () -> Bool) {
+    if !test() { print("fail", test()) }
+}
+""",
+        bug_summary="On failure, test() runs a second time so the autoclosure side effects repeat",
+        bug_category="autoclosure",
+        difficulty="beginner",
+        hints=("Store test() in a let",),
+        keywords=("autoclosure", "twice", "assert", "side effect"),
+    ),
+    "default-instance-member": MockSnippet(
+        code="""\
+class Maker {
+    var base = 10
+    func add(n: Int = base) -> Int { n + base }
+}
+""",
+        bug_summary="Default n: Int = base uses instance member base, which is not allowed",
+        bug_category="default arguments",
+        difficulty="intermediate",
+        hints=("Use a static default or pass base",),
+        keywords=("default", "instance", "base", "argument"),
+    ),
+    "default-proto-extension": MockSnippet(
+        code="""\
+protocol Reset {
+    func reset(to value: Int)
+}
+extension Reset {
+    func reset(to value: Int = 0) { }
+}
+struct Counter: Reset {
+    func reset(to value: Int) {}
+}
+func zero(_ c: Counter) { c.reset() }
+""",
+        bug_summary="Counter.reset() has no default; the extension's default is not the protocol witness default",
+        bug_category="default arguments",
+        difficulty="advanced",
+        hints=("Add a default on the protocol requirement",),
+        keywords=("protocol", "extension", "default", "reset"),
+    ),
+    "main-task-ui": MockSnippet(
+        code="""\
+import UIKit
+func paint(_ view: UIView) {
+    Task.detached {
+        view.backgroundColor = .red
+    }
+}
+""",
+        bug_summary="UIView is mutated from Task.detached, which is not the main actor",
+        bug_category="MainActor",
+        difficulty="intermediate",
+        hints=("MainActor.run",),
+        keywords=("MainActor", "UIView", "detached", "UI"),
+    ),
+    "main-callback-label": MockSnippet(
+        code="""\
+import UIKit
+func ping(_ field: UITextField, url: URL) {
+    URLSession.shared.dataTask(with: url) { data, _, _ in
+        field.text = data.flatMap { String(data: $0, encoding: .utf8) }
+    }.resume()
+}
+""",
+        bug_summary="UITextField.text is set on the session callback queue, not the main actor",
+        bug_category="MainActor",
+        difficulty="intermediate",
+        hints=("Hop to main before touching field",),
+        keywords=("MainActor", "UITextField", "URLSession", "callback"),
+    ),
+    "cancel-ignore-flag": MockSnippet(
+        code="""\
+func drain(_ n: Int) async {
+    var i = 0
+    while i < n {
+        i += 1
+        await Task.yield()
+    }
+}
+""",
+        bug_summary="while loop never reads Task.isCancelled",
+        bug_category="Task cancellation",
+        difficulty="intermediate",
+        hints=("Break when Task.isCancelled",),
+        keywords=("isCancelled", "while", "Task", "cancellation"),
+    ),
+    "cancel-no-check": MockSnippet(
+        code="""\
+func pump(_ n: Int) async {
+    for _ in 0..<n {
+        try? await Task.sleep(for: .milliseconds(1))
+    }
+}
+""",
+        bug_summary="try? swallows CancellationError so the loop does not stop when the task is cancelled",
+        bug_category="Task cancellation",
+        difficulty="intermediate",
+        hints=("Don't swallow cancellation with try?",),
+        keywords=("try?", "CancellationError", "sleep", "loop"),
+    ),
+    "actor-await-stale": MockSnippet(
+        code="""\
+actor Flag {
+    var on = false
+    func toggle() async {
+        let was = on
+        await Task.yield()
+        on = !was
+    }
+}
+""",
+        bug_summary="toggle awaits then writes !was, racing another toggle and losing updates",
+        bug_category="actor reentrancy",
+        difficulty="advanced",
+        hints=("Toggle on after await without the snapshot",),
+        keywords=("actor", "reentrancy", "toggle", "await"),
+    ),
+    "actor-await-balance": MockSnippet(
+        code="""\
+actor Tank {
+    var ml = 100
+    func pour(_ x: Int) async {
+        await Task.yield()
+        ml -= x
+    }
+}
+""",
+        bug_summary="pour does not check remaining ml after await so concurrent pours can drive ml negative",
+        bug_category="actor reentrancy",
+        difficulty="advanced",
+        hints=("Guard ml after await",),
+        keywords=("actor", "reentrancy", "pour", "await"),
+    ),
+    "ui-env-missing": MockSnippet(
+        code="""\
+import SwiftUI
+class Hub: ObservableObject { var title = "" }
+struct Pane: View {
+    @EnvironmentObject var hub: Hub
+    var body: some View { Text(hub.title) }
+}
+""",
+        bug_summary="@EnvironmentObject Hub is never injected by a parent view",
+        bug_category="SwiftUI environment",
+        difficulty="intermediate",
+        hints=("environmentObject(Hub())",),
+        keywords=("EnvironmentObject", "Hub", "inject", "SwiftUI"),
+    ),
+    "ui-observable-state": MockSnippet(
+        code="""\
+import SwiftUI
+@Observable
+final class Hub { var title = "" }
+struct Pane: View {
+    @State private var hub = Hub()
+    var body: some View { Text(hub.title) }
+}
+""",
+        bug_summary="@State creates a private Hub; siblings cannot share it through the environment",
+        bug_category="SwiftUI environment",
+        difficulty="intermediate",
+        hints=("@Environment(Hub.self)",),
+        keywords=("@State", "@Observable", "Hub", "share"),
+    ),
+    "slice-index-zero": MockSnippet(
+        code="""\
+func last(_ slice: ArraySlice<String>) -> String {
+    return slice[slice.count - 1]
+}
+""",
+        bug_summary="slice[count - 1] assumes indices start at 0; slices often start later and trap",
+        bug_category="Sequence slices",
+        difficulty="beginner",
+        hints=("slice.last or endIndex",),
+        keywords=("ArraySlice", "count", "indices", "trap"),
+    ),
+    "slice-drop-first": MockSnippet(
+        code="""\
+func tail(_ items: [String]) -> String {
+    let t = items.suffix(from: 1)
+    return t[1]
+}
+""",
+        bug_summary="suffix(from: 1) keeps original indices so t[1] is the second original element only if that index exists; it is easy to mix up with 0-based access",
+        bug_category="Sequence slices",
+        difficulty="beginner",
+        hints=("t.startIndex",),
+        keywords=("suffix", "slice", "indices", "1"),
+    ),
 }
 
 _DEFAULT_FALLBACK = MockSnippet(

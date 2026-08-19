@@ -529,6 +529,419 @@ func name(from result: Result<String, Error>) -> String {
         hints=("Add throws or handle the error",),
         keywords=("Result", "get", "throws", "try"),
     ),
+    "cast-any-force": MockSnippet(
+        code="""\
+func asInt(_ value: Any) -> Int {
+    return value as! Int
+}
+""",
+        bug_summary="as! traps if value is not actually an Int",
+        bug_category="type casting",
+        difficulty="beginner",
+        hints=("Use as?",),
+        keywords=("as!", "Any", "cast", "Int"),
+    ),
+    "cast-array-wrong": MockSnippet(
+        code="""\
+func labels(_ values: [Any]) -> [String] {
+    return values as! [String]
+}
+""",
+        bug_summary="as! [String] traps when the array holds mixed Any values",
+        bug_category="type casting",
+        difficulty="beginner",
+        hints=("compactMap as? String",),
+        keywords=("as!", "array", "String", "cast"),
+    ),
+    "init-url-force": MockSnippet(
+        code="""\
+func page(_ raw: String) -> URL {
+    return URL(string: raw)!
+}
+""",
+        bug_summary="URL(string:) is failable; force unwrap crashes on a bad string",
+        bug_category="failable init",
+        difficulty="beginner",
+        hints=("URL(string:) returns URL?",),
+        keywords=("URL", "init?", "failable", "force unwrap"),
+    ),
+    "init-int-force": MockSnippet(
+        code="""\
+func count(from text: String) -> Int {
+    return Int(text)!
+}
+""",
+        bug_summary="Int(String) is failable; force unwrap crashes on non-digits",
+        bug_category="failable init",
+        difficulty="beginner",
+        hints=("Int(text) is Int?",),
+        keywords=("Int", "String", "failable", "init?"),
+    ),
+    "inout-local-copy": MockSnippet(
+        code="""\
+func bump(_ n: Int) {
+    var local = n
+    local += 1
+}
+""",
+        bug_summary="Mutates a local copy; the caller's Int is unchanged because there is no inout",
+        bug_category="inout / COW",
+        difficulty="beginner",
+        hints=("Need inout",),
+        keywords=("inout", "copy", "mutate", "local"),
+    ),
+    "cow-iterate-mutate": MockSnippet(
+        code="""\
+func grow(_ items: inout [Int]) {
+    for x in items {
+        items.append(x)
+    }
+}
+""",
+        bug_summary="Appending to items while iterating it is undefined / traps",
+        bug_category="inout / COW",
+        difficulty="intermediate",
+        hints=("Don't mutate during for-in",),
+        keywords=("iterate", "append", "mutate", "array"),
+    ),
+    "enum-if-case-wrong": MockSnippet(
+        code="""\
+enum Box { case full(String), empty }
+func text(_ box: Box) -> String {
+    if case .full = box {
+        return "n/a"
+    }
+    return ""
+}
+""",
+        bug_summary="if case .full does not bind the associated String, so the payload is discarded",
+        bug_category="enums",
+        difficulty="beginner",
+        hints=("if case .full(let s)",),
+        keywords=("enum", "if case", "associated", "payload"),
+    ),
+    "enum-switch-assoc": MockSnippet(
+        code="""\
+enum Status { case ok(Int), fail }
+func code(_ status: Status) -> Int {
+    switch status {
+    case .ok:
+        return 0
+    case .fail:
+        return -1
+    }
+}
+""",
+        bug_summary="switch on .ok ignores the associated Int and always returns 0",
+        bug_category="enums",
+        difficulty="beginner",
+        hints=("case .ok(let n)",),
+        keywords=("enum", "switch", "associated", "Int"),
+    ),
+    "defer-after-return": MockSnippet(
+        code="""\
+func read(_ n: Int) -> Int {
+    return n
+    defer { print("done") }
+}
+""",
+        bug_summary="defer after return is unreachable so the cleanup never runs",
+        bug_category="defer",
+        difficulty="beginner",
+        hints=("defer before return",),
+        keywords=("defer", "return", "unreachable", "cleanup"),
+    ),
+    "defer-stale-copy": MockSnippet(
+        code="""\
+func bump(_ n: Int) -> Int {
+    var n = n
+    defer { n += 1 }
+    return n
+}
+""",
+        bug_summary="defer runs after the return value is copied, so n += 1 never affects the caller",
+        bug_category="defer",
+        difficulty="intermediate",
+        hints=("Mutate before return",),
+        keywords=("defer", "return", "copied", "mutate"),
+    ),
+    "unowned-self-gone": MockSnippet(
+        code="""\
+class Loader {
+    var done: (() -> Void)?
+    func start() {
+        done = { [unowned self] in self.finish() }
+    }
+    func finish() {}
+}
+""",
+        bug_summary="unowned self crashes if done runs after Loader is released",
+        bug_category="unowned",
+        difficulty="intermediate",
+        hints=("Use weak self",),
+        keywords=("unowned", "self", "crash", "released"),
+    ),
+    "unowned-not-weak": MockSnippet(
+        code="""\
+class Node {
+    unowned var parent: Node
+    init(parent: Node) { self.parent = parent }
+}
+""",
+        bug_summary="unowned parent crashes if the parent can be nil; a root has no parent",
+        bug_category="unowned",
+        difficulty="intermediate",
+        hints=("weak var parent: Node?",),
+        keywords=("unowned", "parent", "nil", "weak"),
+    ),
+    "some-any-assoc": MockSnippet(
+        code="""\
+protocol Item { associatedtype ID }
+func first(_ items: [Item]) -> Item {
+    return items[0]
+}
+""",
+        bug_summary="Item has an associated type so it cannot be used as [Item] or a return type",
+        bug_category="some vs any",
+        difficulty="intermediate",
+        hints=("any Item or a generic",),
+        keywords=("associatedtype", "any", "protocol", "Item"),
+    ),
+    "some-return-mismatch": MockSnippet(
+        code="""\
+protocol Shape {}
+struct Dot: Shape {}
+struct Box: Shape {}
+func make(flag: Bool) -> some Shape {
+    if flag { return Dot() }
+    return Box()
+}
+""",
+        bug_summary="some Shape must be one concrete type; Dot and Box cannot both be returned",
+        bug_category="some vs any",
+        difficulty="intermediate",
+        hints=("any Shape",),
+        keywords=("some", "opaque", "return", "Shape"),
+    ),
+    "auto-store-nonescaping": MockSnippet(
+        code="""\
+var later: (() -> Int)?
+func once(_ work: @autoclosure () -> Int) {
+    later = work
+}
+""",
+        bug_summary="Non-escaping autoclosure cannot be stored in later for later execution",
+        bug_category="autoclosure",
+        difficulty="intermediate",
+        hints=("@autoclosure @escaping",),
+        keywords=("autoclosure", "escaping", "stored", "closure"),
+    ),
+    "auto-eval-twice": MockSnippet(
+        code="""\
+func both(_ work: @autoclosure () -> Int) -> Int {
+    return work() + work()
+}
+""",
+        bug_summary="Autoclosure work() is evaluated twice so side effects run twice",
+        bug_category="autoclosure",
+        difficulty="beginner",
+        hints=("Call work once",),
+        keywords=("autoclosure", "twice", "side effect", "evaluate"),
+    ),
+    "default-instance-member": MockSnippet(
+        code="""\
+struct Tag {
+    var prefix = "id-"
+    func make(id: String = prefix) -> String {
+        return prefix + id
+    }
+}
+""",
+        bug_summary="Default arguments cannot use instance members like prefix",
+        bug_category="default arguments",
+        difficulty="intermediate",
+        hints=("Pass prefix at the call or compute inside",),
+        keywords=("default", "instance", "prefix", "argument"),
+    ),
+    "default-proto-extension": MockSnippet(
+        code="""\
+protocol Named {
+    func label(suffix: String)
+}
+extension Named {
+    func label(suffix: String = "") {}
+}
+struct User: Named {
+    func label(suffix: String) {}
+}
+func run(_ user: User) {
+    user.label()
+}
+""",
+        bug_summary="The extension default does not add a default to Named.label; User.label() still needs suffix",
+        bug_category="default arguments",
+        difficulty="advanced",
+        hints=("Default on the requirement, not only the extension",),
+        keywords=("default", "protocol", "extension", "requirement"),
+    ),
+    "main-task-ui": MockSnippet(
+        code="""\
+import UIKit
+func load(_ label: UILabel) {
+    Task {
+        let text = "ok"
+        label.text = text
+    }
+}
+""",
+        bug_summary="UILabel is updated from an unstructured Task off the main actor",
+        bug_category="MainActor",
+        difficulty="intermediate",
+        hints=("@MainActor or MainActor.run",),
+        keywords=("MainActor", "UILabel", "Task", "UI"),
+    ),
+    "main-callback-label": MockSnippet(
+        code="""\
+import UIKit
+func fetch(_ label: UILabel, url: URL) {
+    URLSession.shared.dataTask(with: url) { _, _, _ in
+        label.text = "done"
+    }.resume()
+}
+""",
+        bug_summary="URLSession callback is not on the main actor but writes UILabel.text",
+        bug_category="MainActor",
+        difficulty="intermediate",
+        hints=("Dispatch to main",),
+        keywords=("MainActor", "URLSession", "UILabel", "callback"),
+    ),
+    "cancel-ignore-flag": MockSnippet(
+        code="""\
+func chew(_ n: Int) async {
+    for i in 0..<n {
+        await Task.yield()
+        print(i)
+    }
+}
+""",
+        bug_summary="Loop never checks Task.isCancelled so cancellation is ignored",
+        bug_category="Task cancellation",
+        difficulty="intermediate",
+        hints=("Task.isCancelled",),
+        keywords=("cancellation", "isCancelled", "Task", "loop"),
+    ),
+    "cancel-no-check": MockSnippet(
+        code="""\
+func chew(_ n: Int) async throws {
+    for _ in 0..<n {
+        try await Task.sleep(nanoseconds: 1)
+    }
+}
+""",
+        bug_summary="Throwing loop never calls Task.checkCancellation()",
+        bug_category="Task cancellation",
+        difficulty="intermediate",
+        hints=("try Task.checkCancellation()",),
+        keywords=("checkCancellation", "Task", "throws", "loop"),
+    ),
+    "actor-await-stale": MockSnippet(
+        code="""\
+actor Counter {
+    var n = 0
+    func bump() async {
+        let start = n
+        await Task.yield()
+        n = start + 1
+    }
+}
+""",
+        bug_summary="After await, n may have changed; writing start + 1 loses concurrent bumps",
+        bug_category="actor reentrancy",
+        difficulty="advanced",
+        hints=("Re-read n after await",),
+        keywords=("actor", "reentrancy", "await", "stale"),
+    ),
+    "actor-await-balance": MockSnippet(
+        code="""\
+actor Wallet {
+    var cash = 10
+    func spend(_ k: Int) async -> Bool {
+        if cash < k { return false }
+        await Task.yield()
+        cash -= k
+        return true
+    }
+}
+""",
+        bug_summary="Balance is checked, then await lets another spend run; cash -= k can go negative",
+        bug_category="actor reentrancy",
+        difficulty="advanced",
+        hints=("Check cash again after await",),
+        keywords=("actor", "reentrancy", "balance", "await"),
+    ),
+    "ui-env-missing": MockSnippet(
+        code="""\
+import SwiftUI
+class Store: ObservableObject {}
+struct Screen: View {
+    @EnvironmentObject var store: Store
+    var body: some View { Text("hi") }
+}
+struct Root: View {
+    var body: some View { Screen() }
+}
+""",
+        bug_summary="Screen needs an EnvironmentObject but Root never calls environmentObject(Store())",
+        bug_category="SwiftUI environment",
+        difficulty="intermediate",
+        hints=(".environmentObject",),
+        keywords=("EnvironmentObject", "injection", "SwiftUI", "Store"),
+    ),
+    "ui-observable-state": MockSnippet(
+        code="""\
+import SwiftUI
+@Observable
+final class Store { var n = 0 }
+struct Root: View {
+    @State var store = Store()
+    var body: some View { Child(store: store) }
+}
+struct Child: View {
+    var store: Store
+    var body: some View { Text("\\(store.n)") }
+}
+""",
+        bug_summary="@State owns a new Store per Root identity; Child should get a shared environment model",
+        bug_category="SwiftUI environment",
+        difficulty="intermediate",
+        hints=("@Environment or @Bindable",),
+        keywords=("@Observable", "@State", "environment", "Store"),
+    ),
+    "slice-index-zero": MockSnippet(
+        code="""\
+func first(_ items: ArraySlice<Int>) -> Int {
+    return items[0]
+}
+""",
+        bug_summary="ArraySlice indices are not zero-based; items[0] traps if startIndex is not 0",
+        bug_category="Sequence slices",
+        difficulty="beginner",
+        hints=("items[items.startIndex]",),
+        keywords=("ArraySlice", "indices", "startIndex", "0"),
+    ),
+    "slice-drop-first": MockSnippet(
+        code="""\
+func second(_ items: [Int]) -> Int {
+    let rest = items.dropFirst()
+    return rest[0]
+}
+""",
+        bug_summary="dropFirst() yields a slice whose startIndex is 1, so rest[0] traps",
+        bug_category="Sequence slices",
+        difficulty="beginner",
+        hints=("rest.first or startIndex",),
+        keywords=("dropFirst", "slice", "startIndex", "0"),
+    ),
 }
 
 
