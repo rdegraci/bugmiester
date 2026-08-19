@@ -207,6 +207,21 @@ func first(_ values: [Int]) -> Int {
         hints=("Check isEmpty first",),
         keywords=("empty", "index", "crash", "bounds"),
     ),
+    "opt-iflet-outer": MockSnippet(
+        code="""\
+func display(_ name: String?) -> String {
+    if let name {
+        print("bound")
+    }
+    return name
+}
+""",
+        bug_summary="if let binds name only inside the block; the return still uses the outer String?",
+        bug_category="optionals",
+        difficulty="beginner",
+        hints=("The unwrap does not last past the if",),
+        keywords=("if let", "optional", "outer", "unwrap"),
+    ),
     "conc-await-miss": MockSnippet(
         code="""\
 func load() async -> String {
@@ -219,6 +234,23 @@ func fetchRemote() async -> String { "ok" }
         difficulty="intermediate",
         hints=("fetchRemote is async",),
         keywords=("await", "async", "missing"),
+    ),
+    "conc-nontask-async": MockSnippet(
+        code="""\
+import UIKit
+final class Screen: UIViewController {
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        title = await load()
+    }
+    func load() async -> String { "ok" }
+}
+""",
+        bug_summary="viewDidLoad is not async, so it cannot await load(); wrap the call in Task",
+        bug_category="concurrency",
+        difficulty="intermediate",
+        hints=("Start a Task in viewDidLoad",),
+        keywords=("viewDidLoad", "Task", "async", "await"),
     ),
     "acc-mutating-let": MockSnippet(
         code="""\
@@ -282,6 +314,43 @@ struct NameForm: View {
         hints=("Use $name",),
         keywords=("Binding", "$", "TextField", "@State"),
     ),
+    "ui-stateobject-passed": MockSnippet(
+        code="""\
+import SwiftUI
+final class Model: ObservableObject { @Published var n = 0 }
+struct Pane: View {
+    @StateObject var model: Model
+    var body: some View { Text("\\(model.n)") }
+}
+struct Root: View {
+    @StateObject var model = Model()
+    var body: some View { Pane(model: model) }
+}
+""",
+        bug_summary="@StateObject on Pane takes a Model the parent already owns; Pane should use @ObservedObject",
+        bug_category="SwiftUI state",
+        difficulty="intermediate",
+        hints=("@ObservedObject for a passed-in object",),
+        keywords=("@StateObject", "@ObservedObject", "passed", "owned"),
+    ),
+    "ui-foreach-index": MockSnippet(
+        code="""\
+import SwiftUI
+struct Roster: View {
+    var names: [String]
+    var body: some View {
+        ForEach(0..<names.count) { i in
+            Text(names[i])
+        }
+    }
+}
+""",
+        bug_summary="ForEach(0..<count) identifies rows by index, so inserts and deletes reuse the wrong views",
+        bug_category="SwiftUI state",
+        difficulty="intermediate",
+        hints=("Identify rows by a stable id",),
+        keywords=("ForEach", "index", "identity", "count"),
+    ),
     "cap-stored-self": MockSnippet(
         code="""\
 class Speaker {
@@ -315,6 +384,26 @@ class Ticker {
         difficulty="intermediate",
         hints=("Timer plus self",),
         keywords=("Timer", "retain cycle", "self", "closure"),
+    ),
+    "cap-session-vc": MockSnippet(
+        code="""\
+import UIKit
+final class Screen: UIViewController {
+    var task: URLSessionDataTask?
+    var payload: Data?
+    func load(_ url: URL) {
+        task = URLSession.shared.dataTask(with: url) { data, _, _ in
+            self.payload = data
+        }
+        task?.resume()
+    }
+}
+""",
+        bug_summary="Stored URLSession task retains a completion that strongly captures self",
+        bug_category="captures",
+        difficulty="intermediate",
+        hints=("[weak self] in the completion",),
+        keywords=("URLSession", "retain cycle", "self", "completion"),
     ),
     "eq-identity-id": MockSnippet(
         code="""\
@@ -815,6 +904,24 @@ func fetch(_ label: UILabel, url: URL) {
         hints=("Dispatch to main",),
         keywords=("MainActor", "URLSession", "UILabel", "callback"),
     ),
+    "main-task-published": MockSnippet(
+        code="""\
+import Combine
+final class Board: ObservableObject {
+    @Published var heading = ""
+    func refresh() {
+        Task {
+            heading = "ok"
+        }
+    }
+}
+""",
+        bug_summary="@Published heading is written from an unstructured Task that is not on the main actor",
+        bug_category="MainActor",
+        difficulty="intermediate",
+        hints=("Hop to the main actor before publishing",),
+        keywords=("MainActor", "@Published", "Task", "ObservableObject"),
+    ),
     "cancel-ignore-flag": MockSnippet(
         code="""\
 func chew(_ n: Int) async {
@@ -917,6 +1024,31 @@ struct Child: View {
         hints=("@Environment or @Bindable",),
         keywords=("@Observable", "@State", "environment", "Store"),
     ),
+    "ui-env-wrong-sibling": MockSnippet(
+        code="""\
+import SwiftUI
+final class Store: ObservableObject { @Published var title = "Hi" }
+struct Root: View {
+    @StateObject var store = Store()
+    var body: some View {
+        HStack {
+            Sidebar().environmentObject(store)
+            Detail()
+        }
+    }
+}
+struct Sidebar: View { var body: some View { Text("nav") } }
+struct Detail: View {
+    @EnvironmentObject var store: Store
+    var body: some View { Text(store.title) }
+}
+""",
+        bug_summary="environmentObject is attached to Sidebar, so sibling Detail never receives Store",
+        bug_category="SwiftUI environment",
+        difficulty="intermediate",
+        hints=("Inject on the common ancestor",),
+        keywords=("environmentObject", "sibling", "HStack", "EnvironmentObject"),
+    ),
     "slice-index-zero": MockSnippet(
         code="""\
 func first(_ items: ArraySlice<Int>) -> Int {
@@ -986,6 +1118,28 @@ final class Caption {
         difficulty="intermediate",
         hints=("receive(on: DispatchQueue.main)",),
         keywords=("receive(on:)", "main", "dataTaskPublisher", "UILabel"),
+    ),
+    "comb-bag-local": MockSnippet(
+        code="""\
+import Combine
+
+final class Board: ObservableObject {
+    @Published var label = ""
+    func bind() {
+        var bag = Set<AnyCancellable>()
+        Just("ok")
+            .sink { [weak self] text in
+                self?.label = text
+            }
+            .store(in: &bag)
+    }
+}
+""",
+        bug_summary="bag is local to bind(), so the Set dies when the function returns and the subscription cancels",
+        bug_category="Combine",
+        difficulty="intermediate",
+        hints=("Store the Set on Board",),
+        keywords=("AnyCancellable", "local", "Set", "store"),
     ),
 }
 

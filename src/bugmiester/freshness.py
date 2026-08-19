@@ -41,13 +41,43 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
     ScenarioSeed("conc-actor-mut", "concurrency", "timer callback bump", "must involve actor"),
     ScenarioSeed("val-let-struct", "value vs reference", "immutable point"),
     ScenarioSeed("opt-array-first", "optionals", "first element access"),
+    ScenarioSeed(
+        "opt-iflet-outer",
+        "optionals",
+        "if let then uses the outer optional",
+        "must bind with if let or guard let then still use the wrapped optional; no force unwrap",
+    ),
     ScenarioSeed("conc-await-miss", "concurrency", "missing await on async call"),
+    ScenarioSeed(
+        "conc-nontask-async",
+        "concurrency",
+        "async work from viewDidLoad without Task",
+        "must call async from a sync UIKit entry; not a missing await inside an async function",
+    ),
     ScenarioSeed("acc-mutating-let", "access control", "mutating method on a let value"),
     ScenarioSeed("acc-private-field", "access control", "private property from a free function"),
     ScenarioSeed("ui-state-let", "SwiftUI state", "counter button stored as let"),
     ScenarioSeed("ui-binding-dollar", "SwiftUI state", "TextField missing binding prefix"),
+    ScenarioSeed(
+        "ui-stateobject-passed",
+        "SwiftUI state",
+        "StateObject owns an object the parent passed in",
+        "must involve @StateObject on a passed-in object; not $ Binding; not let count",
+    ),
+    ScenarioSeed(
+        "ui-foreach-index",
+        "SwiftUI state",
+        "ForEach over 0..<count",
+        "must be ForEach identity; not $ Binding; not @State let",
+    ),
     ScenarioSeed("cap-stored-self", "captures", "escaping closure stored on self"),
     ScenarioSeed("cap-timer-cycle", "captures", "repeating timer owned by self"),
+    ScenarioSeed(
+        "cap-session-vc",
+        "captures",
+        "URLSession completion on a view controller",
+        "must capture self in a URLSession completion stored on the VC; not a Timer; not missing await; not MainActor",
+    ),
     ScenarioSeed("eq-identity-id", "equality", "identity used instead of id equality"),
     ScenarioSeed("eq-missing-protocol", "equality", "class compared with == but not Equatable"),
     ScenarioSeed(
@@ -243,6 +273,12 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
         "must hop to the main actor; not Sendable",
     ),
     ScenarioSeed(
+        "main-task-published",
+        "MainActor",
+        "ViewModel publishes from an unstructured Task",
+        "must update @Published off the main actor from Task; not URLSession dataTask; not missing await; not Combine",
+    ),
+    ScenarioSeed(
         "cancel-ignore-flag",
         "Task cancellation",
         "loop ignores Task.isCancelled",
@@ -279,6 +315,12 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
         "must involve @Observable or environment; not TextField $",
     ),
     ScenarioSeed(
+        "ui-env-wrong-sibling",
+        "SwiftUI environment",
+        "environmentObject attached to the wrong sibling",
+        "must inject on a sibling, not the ancestor of the consumer; not $ Binding",
+    ),
+    ScenarioSeed(
         "slice-index-zero",
         "Sequence slices",
         "ArraySlice indexed from 0",
@@ -301,6 +343,12 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
         "Combine",
         "publisher updates UI off the main queue",
         "must involve Combine receive(on:) or a publisher thread hop; not URLSession dataTask; not missing await",
+    ),
+    ScenarioSeed(
+        "comb-bag-local",
+        "Combine",
+        "cancellables stored in a local Set",
+        "must store AnyCancellable in a function-local Set; not a retain cycle; not missing await; not receive(on:)",
     ),
 )
 

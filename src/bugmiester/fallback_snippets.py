@@ -149,6 +149,21 @@ func head(_ items: [String]) -> String {
         hints=("first is optional",),
         keywords=("force unwrap", "first", "empty", "nil"),
     ),
+    "opt-iflet-outer": MockSnippet(
+        code="""\
+func join(_ a: String?, _ b: String) -> String {
+    if let a {
+        return a + b
+    }
+    return a + b
+}
+""",
+        bug_summary="The else branch uses a as String? after if let already ended",
+        bug_category="optionals",
+        difficulty="beginner",
+        hints=("Unwrap in both branches, or return a default",),
+        keywords=("if let", "else", "optional", "String"),
+    ),
     "conc-await-miss": MockSnippet(
         code="""\
 func main() async {
@@ -162,6 +177,22 @@ func load() async -> Int { 1 }
         difficulty="intermediate",
         hints=("load is async",),
         keywords=("await", "async", "missing"),
+    ),
+    "conc-nontask-async": MockSnippet(
+        code="""\
+import UIKit
+final class Screen: UIViewController {
+    func appear() {
+        title = await fetch()
+    }
+    func fetch() async -> String { "ok" }
+}
+""",
+        bug_summary="appear() is a sync method, so await fetch() is illegal; start a Task instead",
+        bug_category="concurrency",
+        difficulty="intermediate",
+        hints=("Task { title = await fetch() }",),
+        keywords=("Task", "async", "await", "sync"),
     ),
     "acc-mutating-let": MockSnippet(
         code="""\
@@ -222,6 +253,42 @@ struct SwitchRow: View {
         hints=("Use $enabled",),
         keywords=("Binding", "$", "Toggle", "@State"),
     ),
+    "ui-stateobject-passed": MockSnippet(
+        code="""\
+import SwiftUI
+final class Model: ObservableObject { @Published var n = 0 }
+struct Pane: View {
+    @StateObject var model: Model
+    init(model: Model) {
+        _model = StateObject(wrappedValue: model)
+    }
+    var body: some View { Text("\\(model.n)") }
+}
+""",
+        bug_summary="StateObject(wrappedValue:) still claims ownership of a Model created elsewhere",
+        bug_category="SwiftUI state",
+        difficulty="intermediate",
+        hints=("Use ObservedObject(wrappedValue:)",),
+        keywords=("StateObject", "wrappedValue", "ownership", "ObservedObject"),
+    ),
+    "ui-foreach-index": MockSnippet(
+        code="""\
+import SwiftUI
+struct Roster: View {
+    var items: [String]
+    var body: some View {
+        ForEach(Array(items.enumerated()), id: \\.offset) { _, item in
+            Text(item)
+        }
+    }
+}
+""",
+        bug_summary="ForEach ids rows by enumerated offset, so later inserts reuse the wrong identity",
+        bug_category="SwiftUI state",
+        difficulty="intermediate",
+        hints=("Use a stable item id, not offset",),
+        keywords=("ForEach", "offset", "enumerated", "identity"),
+    ),
     "cap-stored-self": MockSnippet(
         code="""\
 final class Hook {
@@ -252,6 +319,25 @@ final class Pump {
         difficulty="intermediate",
         hints=("self.arm inside again",),
         keywords=("retain cycle", "self", "closure", "stored"),
+    ),
+    "cap-session-vc": MockSnippet(
+        code="""\
+import UIKit
+final class Screen: UIViewController {
+    var task: URLSessionDataTask?
+    func load(_ url: URL) {
+        task = URLSession.shared.dataTask(with: url) { _, _, _ in
+            self.view.setNeedsLayout()
+        }
+        task?.resume()
+    }
+}
+""",
+        bug_summary="The VC stores the data task whose completion captures self, forming a retain cycle",
+        bug_category="captures",
+        difficulty="intermediate",
+        hints=("Capture [weak self]",),
+        keywords=("dataTask", "retain cycle", "self", "UIViewController"),
     ),
     "eq-identity-id": MockSnippet(
         code="""\
@@ -756,6 +842,24 @@ func ping(_ field: UITextField, url: URL) {
         hints=("Hop to main before touching field",),
         keywords=("MainActor", "UITextField", "URLSession", "callback"),
     ),
+    "main-task-published": MockSnippet(
+        code="""\
+import Combine
+final class Roster: ObservableObject {
+    @Published var count = 0
+    func bump() {
+        DispatchQueue.global().async {
+            self.count += 1
+        }
+    }
+}
+""",
+        bug_summary="@Published count is incremented on a background queue, not the main actor",
+        bug_category="MainActor",
+        difficulty="intermediate",
+        hints=("Publish on the main queue",),
+        keywords=("MainActor", "@Published", "background", "DispatchQueue"),
+    ),
     "cancel-ignore-flag": MockSnippet(
         code="""\
 func drain(_ n: Int) async {
@@ -850,6 +954,31 @@ struct Pane: View {
         hints=("@Environment(Hub.self)",),
         keywords=("@State", "@Observable", "Hub", "share"),
     ),
+    "ui-env-wrong-sibling": MockSnippet(
+        code="""\
+import SwiftUI
+final class Hub: ObservableObject { @Published var title = "" }
+struct Root: View {
+    @StateObject var hub = Hub()
+    var body: some View {
+        TabView {
+            NavPane().environmentObject(hub)
+            BodyPane()
+        }
+    }
+}
+struct NavPane: View { var body: some View { Text("nav") } }
+struct BodyPane: View {
+    @EnvironmentObject var hub: Hub
+    var body: some View { Text(hub.title) }
+}
+""",
+        bug_summary="environmentObject is on NavPane only, so BodyPane in the other tab has no Hub",
+        bug_category="SwiftUI environment",
+        difficulty="intermediate",
+        hints=("Attach environmentObject to TabView",),
+        keywords=("environmentObject", "TabView", "sibling", "Hub"),
+    ),
     "slice-index-zero": MockSnippet(
         code="""\
 func last(_ slice: ArraySlice<String>) -> String {
@@ -916,6 +1045,26 @@ final class Roster: ObservableObject {
         difficulty="intermediate",
         hints=("receive(on: DispatchQueue.main) before assign",),
         keywords=("receive(on:)", "@Published", "dataTaskPublisher", "main"),
+    ),
+    "comb-bag-local": MockSnippet(
+        code="""\
+import Combine
+import UIKit
+
+final class Screen: UIViewController {
+    func viewDidLoadBind() {
+        var bag = Set<AnyCancellable>()
+        NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
+            .sink { _ in print("active") }
+            .store(in: &bag)
+    }
+}
+""",
+        bug_summary="viewDidLoadBind stores cancellables in a local Set that is released when the method returns",
+        bug_category="Combine",
+        difficulty="intermediate",
+        hints=("Keep the Set as a property on Screen",),
+        keywords=("AnyCancellable", "viewDidLoad", "local", "Set"),
     ),
 }
 
