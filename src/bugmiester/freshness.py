@@ -27,7 +27,7 @@ class ScenarioSeed:
         return base
 
 
-# Curated pool — 30 categories so a 10-bug round can skip class repeats
+# Curated pool — 31 categories so a 10-bug round can skip class repeats
 # and later rounds still have unused classes.
 SEED_POOL: tuple[ScenarioSeed, ...] = (
     ScenarioSeed("opt-dict-force", "optionals", "dictionary lookup"),
@@ -289,6 +289,18 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
         "Sequence slices",
         "dropFirst slice then uses [0]",
         "must use a slice after dropFirst or suffix",
+    ),
+    ScenarioSeed(
+        "comb-sink-dropped",
+        "Combine",
+        "sink result not stored",
+        "must drop AnyCancellable; not a retain cycle; not missing await",
+    ),
+    ScenarioSeed(
+        "comb-receive-main",
+        "Combine",
+        "publisher updates UI off the main queue",
+        "must involve Combine receive(on:) or a publisher thread hop; not URLSession dataTask; not missing await",
     ),
 )
 

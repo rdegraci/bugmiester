@@ -875,6 +875,48 @@ func tail(_ items: [String]) -> String {
         hints=("t.startIndex",),
         keywords=("suffix", "slice", "indices", "1"),
     ),
+    "comb-sink-dropped": MockSnippet(
+        code="""\
+import Combine
+import Foundation
+
+final class Clock {
+    func start() {
+        Timer.publish(every: 1, on: .main, in: .common)
+            .autoconnect()
+            .sink { date in
+                print(date)
+            }
+    }
+}
+""",
+        bug_summary="Timer.publish sink is not stored, so the subscription ends as soon as start() returns",
+        bug_category="Combine",
+        difficulty="intermediate",
+        hints=("Keep the cancellable on Clock",),
+        keywords=("Timer.publish", "sink", "AnyCancellable", "store"),
+    ),
+    "comb-receive-main": MockSnippet(
+        code="""\
+import Combine
+
+final class Roster: ObservableObject {
+    @Published var heading = ""
+
+    func load(_ url: URL) {
+        URLSession.shared.dataTaskPublisher(for: url)
+            .map { String(data: $0.data, encoding: .utf8) ?? "" }
+            .replaceError(with: "")
+            .assign(to: &$heading)
+    }
+}
+""",
+        bug_summary="@Published heading is assigned from dataTaskPublisher without hopping to the main queue",
+        bug_category="Combine",
+        difficulty="intermediate",
+        hints=("receive(on: DispatchQueue.main) before assign",),
+        keywords=("receive(on:)", "@Published", "dataTaskPublisher", "main"),
+    ),
 }
 
 _DEFAULT_FALLBACK = MockSnippet(

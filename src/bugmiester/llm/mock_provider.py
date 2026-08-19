@@ -942,6 +942,51 @@ func second(_ items: [Int]) -> Int {
         hints=("rest.first or startIndex",),
         keywords=("dropFirst", "slice", "startIndex", "0"),
     ),
+    "comb-sink-dropped": MockSnippet(
+        code="""\
+import Combine
+
+final class Pulse {
+    let ticks = PassthroughSubject<Int, Never>()
+
+    func listen() {
+        ticks.sink { value in
+            print(value)
+        }
+    }
+}
+""",
+        bug_summary="sink returns AnyCancellable that is discarded, so the subscription cancels immediately",
+        bug_category="Combine",
+        difficulty="intermediate",
+        hints=("Store the AnyCancellable",),
+        keywords=("AnyCancellable", "sink", "discarded", "subscription"),
+    ),
+    "comb-receive-main": MockSnippet(
+        code="""\
+import Combine
+import UIKit
+
+final class Caption {
+    var bag = Set<AnyCancellable>()
+
+    func fill(_ label: UILabel, url: URL) {
+        URLSession.shared.dataTaskPublisher(for: url)
+            .map { String(data: $0.data, encoding: .utf8) ?? "" }
+            .replaceError(with: "")
+            .sink { text in
+                label.text = text
+            }
+            .store(in: &bag)
+    }
+}
+""",
+        bug_summary="dataTaskPublisher delivers on a background queue; UILabel.text is set without receive(on: main)",
+        bug_category="Combine",
+        difficulty="intermediate",
+        hints=("receive(on: DispatchQueue.main)",),
+        keywords=("receive(on:)", "main", "dataTaskPublisher", "UILabel"),
+    ),
 }
 
 

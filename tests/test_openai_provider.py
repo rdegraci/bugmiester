@@ -140,30 +140,43 @@ def test_round_api_openai_mocked_no_key_leak(tmp_path: Path, monkeypatch) -> Non
     settings = _settings_with_openai(tmp_path, monkeypatch)
     payloads = [
         {
-            "code": f"func bug{i}() {{ return x! }}",
-            "bug_summary": f"Force unwrap number {i}",
+            "code": 'func firstName(from dict: [String: String]) -> String { return dict["name"]! }',
+            "bug_summary": "Force unwrap of a dictionary value that may be nil",
             "bug_category": "optionals",
             "difficulty": "beginner",
             "hints": ["!"],
             "keywords": ["force unwrap", "nil"],
-        }
-        for i in range(3)
+        },
+        {
+            "code": "func average(_ values: [Int]) -> Int { return values.reduce(0, +) / values.count }",
+            "bug_summary": "Division by zero when the array is empty",
+            "bug_category": "collections",
+            "difficulty": "beginner",
+            "hints": ["empty"],
+            "keywords": ["division by zero", "empty"],
+        },
+        {
+            "code": "let origin = Point(x: 0, y: 0)\norigin.x = 1",
+            "bug_summary": "Cannot mutate a let struct value",
+            "bug_category": "value vs reference",
+            "difficulty": "beginner",
+            "hints": ["let"],
+            "keywords": ["let", "mutate", "struct"],
+        },
     ]
+    judge = _completion(
+        json.dumps(
+            {
+                "correct": True,
+                "partial": False,
+                "feedback": "Yes.",
+                "confidence": 0.95,
+            }
+        )
+    )
+    # Extra generate fixtures cover possible freshness retries.
     create_mock = MagicMock(
-        side_effect=[_completion(json.dumps(p)) for p in payloads]
-        + [
-            _completion(
-                json.dumps(
-                    {
-                        "correct": True,
-                        "partial": False,
-                        "feedback": "Yes.",
-                        "confidence": 0.95,
-                    }
-                )
-            )
-        ]
-        * 3
+        side_effect=[_completion(json.dumps(p)) for p in payloads] * 2 + [judge] * 6
     )
     client = MagicMock()
     client.chat.completions.create = create_mock
@@ -189,7 +202,7 @@ def test_round_api_openai_mocked_no_key_leak(tmp_path: Path, monkeypatch) -> Non
                 json={
                     "round_id": round_id,
                     "snippet_id": bug["snippet_id"],
-                    "answer": "force unwrap nil optional",
+                    "answer": "force unwrap nil optional empty division let mutate",
                 },
             ).json()
             if result.get("recovery_available"):
