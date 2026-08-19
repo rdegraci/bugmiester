@@ -194,6 +194,45 @@ final class Screen: UIViewController {
         hints=("Task { title = await fetch() }",),
         keywords=("Task", "async", "await", "sync"),
     ),
+    "conc-task-orphan": MockSnippet(
+        code="""\
+import Foundation
+final class Board {
+    func start() {
+        Task.detached {
+            while true {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                print("still running")
+            }
+        }
+    }
+}
+""",
+        bug_summary="Task.detached is discarded, so the loop never cancels when Board is released",
+        bug_category="concurrency",
+        difficulty="intermediate",
+        hints=("Store the Task and cancel it",),
+        keywords=("Task.detached", "cancel", "orphan", "loop"),
+    ),
+    "conc-continuation-stuck": MockSnippet(
+        code="""\
+import Foundation
+func fetch(_ url: URL) async -> Data {
+    await withCheckedContinuation { cont in
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            if let data {
+                cont.resume(returning: data)
+            }
+        }.resume()
+    }
+}
+""",
+        bug_summary="If data is nil the continuation never resumes, so the async caller hangs",
+        bug_category="concurrency",
+        difficulty="advanced",
+        hints=("Resume on the failure path too",),
+        keywords=("continuation", "resume", "nil", "hang"),
+    ),
     "acc-mutating-let": MockSnippet(
         code="""\
 extension Int {
@@ -289,6 +328,30 @@ struct Roster: View {
         hints=("Use a stable item id, not offset",),
         keywords=("ForEach", "offset", "enumerated", "identity"),
     ),
+    "ui-onappear-task": MockSnippet(
+        code="""\
+import SwiftUI
+struct Clock: View {
+    @State private var stamp = ""
+    var body: some View {
+        Text(stamp)
+            .onAppear {
+                Task {
+                    while true {
+                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        stamp = "tick"
+                    }
+                }
+            }
+    }
+}
+""",
+        bug_summary="onAppear starts an unbounded loop that is not cancelled on disappear",
+        bug_category="SwiftUI state",
+        difficulty="intermediate",
+        hints=("Use .task so SwiftUI cancels the loop",),
+        keywords=("onAppear", "Task", "loop", "cancel"),
+    ),
     "cap-stored-self": MockSnippet(
         code="""\
 final class Hook {
@@ -338,6 +401,27 @@ final class Screen: UIViewController {
         difficulty="intermediate",
         hints=("Capture [weak self]",),
         keywords=("dataTask", "retain cycle", "self", "UIViewController"),
+    ),
+    "cap-notify-observer": MockSnippet(
+        code="""\
+import Foundation
+final class Watch {
+    init() {
+        NotificationCenter.default.addObserver(
+            forName: Notification.Name("tick"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            print(self)
+        }
+    }
+}
+""",
+        bug_summary="Block observer captures self strongly and the token is never stored or removed",
+        bug_category="captures",
+        difficulty="intermediate",
+        hints=("Store the observer token and remove it",),
+        keywords=("addObserver", "token", "self", "NotificationCenter"),
     ),
     "eq-identity-id": MockSnippet(
         code="""\
@@ -693,6 +777,20 @@ func next(_ n: Int) -> Int {
         difficulty="intermediate",
         hints=("Assign n += 1 before return",),
         keywords=("defer", "print", "return", "n"),
+    ),
+    "defer-file-handle": MockSnippet(
+        code="""\
+import Foundation
+func save(_ url: URL, _ data: Data) throws {
+    let handle = try FileHandle(forWritingTo: url)
+    handle.write(data)
+}
+""",
+        bug_summary="The write handle is never closed, so the file descriptor leaks",
+        bug_category="defer",
+        difficulty="beginner",
+        hints=("defer { try? handle.close() }",),
+        keywords=("FileHandle", "write", "close", "leak"),
     ),
     "unowned-self-gone": MockSnippet(
         code="""\
@@ -1065,6 +1163,30 @@ final class Screen: UIViewController {
         difficulty="intermediate",
         hints=("Keep the Set as a property on Screen",),
         keywords=("AnyCancellable", "viewDidLoad", "local", "Set"),
+    ),
+    "comb-never-cancel": MockSnippet(
+        code="""\
+import Combine
+
+final class AppBag {
+    static let shared = AppBag()
+    var bag = Set<AnyCancellable>()
+}
+
+final class Roster: ObservableObject {
+    func bind() {
+        Just(1)
+            .delay(for: .seconds(60), scheduler: RunLoop.main)
+            .sink { _ in print("late") }
+            .store(in: &AppBag.shared.bag)
+    }
+}
+""",
+        bug_summary="The delayed sink is stored on a process-wide bag, so it outlives Roster",
+        bug_category="Combine",
+        difficulty="intermediate",
+        hints=("Keep the cancellable on Roster",),
+        keywords=("AnyCancellable", "shared", "delay", "lifetime"),
     ),
 }
 

@@ -252,6 +252,40 @@ final class Screen: UIViewController {
         hints=("Start a Task in viewDidLoad",),
         keywords=("viewDidLoad", "Task", "async", "await"),
     ),
+    "conc-task-orphan": MockSnippet(
+        code="""\
+import UIKit
+final class Screen: UIViewController {
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        Task {
+            while true {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                self.title = "tick"
+            }
+        }
+    }
+}
+""",
+        bug_summary="Unstructured Task is never stored or cancelled, so it keeps running and retains Screen after pop",
+        bug_category="concurrency",
+        difficulty="intermediate",
+        hints=("Hold the Task and cancel in deinit",),
+        keywords=("Task", "cancel", "orphan", "viewDidLoad"),
+    ),
+    "conc-continuation-stuck": MockSnippet(
+        code="""\
+func wait() async {
+    await withCheckedContinuation { (_: CheckedContinuation<Void, Never>) in
+    }
+}
+""",
+        bug_summary="withCheckedContinuation never calls resume, so the task hangs and the continuation leaks",
+        bug_category="concurrency",
+        difficulty="advanced",
+        hints=("Resume the continuation on every path",),
+        keywords=("continuation", "resume", "hang", "leak"),
+    ),
     "acc-mutating-let": MockSnippet(
         code="""\
 struct Counter {
@@ -351,6 +385,30 @@ struct Roster: View {
         hints=("Identify rows by a stable id",),
         keywords=("ForEach", "index", "identity", "count"),
     ),
+    "ui-onappear-task": MockSnippet(
+        code="""\
+import SwiftUI
+struct Ticker: View {
+    @State private var n = 0
+    var body: some View {
+        Text("\\(n)")
+            .onAppear {
+                Task {
+                    while true {
+                        try? await Task.sleep(nanoseconds: 1_000_000_000)
+                        n += 1
+                    }
+                }
+            }
+    }
+}
+""",
+        bug_summary="onAppear starts a Task that is not cancelled when the view disappears; use .task instead",
+        bug_category="SwiftUI state",
+        difficulty="intermediate",
+        hints=(".task cancels on disappear",),
+        keywords=("onAppear", "Task", "cancel", ".task"),
+    ),
     "cap-stored-self": MockSnippet(
         code="""\
 class Speaker {
@@ -404,6 +462,28 @@ final class Screen: UIViewController {
         difficulty="intermediate",
         hints=("[weak self] in the completion",),
         keywords=("URLSession", "retain cycle", "self", "completion"),
+    ),
+    "cap-notify-observer": MockSnippet(
+        code="""\
+import UIKit
+final class Screen: UIViewController {
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(ping),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
+    }
+    @objc func ping() {}
+}
+""",
+        bug_summary="NotificationCenter keeps a strong observer on Screen because the observer is never removed",
+        bug_category="captures",
+        difficulty="intermediate",
+        hints=("removeObserver in deinit",),
+        keywords=("NotificationCenter", "observer", "remove", "leak"),
     ),
     "eq-identity-id": MockSnippet(
         code="""\
@@ -753,6 +833,20 @@ func bump(_ n: Int) -> Int {
         difficulty="intermediate",
         hints=("Mutate before return",),
         keywords=("defer", "return", "copied", "mutate"),
+    ),
+    "defer-file-handle": MockSnippet(
+        code="""\
+import Foundation
+func slurp(_ url: URL) throws -> Data {
+    let handle = try FileHandle(forReadingFrom: url)
+    return handle.readDataToEndOfFile()
+}
+""",
+        bug_summary="FileHandle is never closed after the read, so the descriptor leaks",
+        bug_category="defer",
+        difficulty="beginner",
+        hints=("defer { try? handle.close() }",),
+        keywords=("FileHandle", "close", "defer", "leak"),
     ),
     "unowned-self-gone": MockSnippet(
         code="""\
@@ -1140,6 +1234,30 @@ final class Board: ObservableObject {
         difficulty="intermediate",
         hints=("Store the Set on Board",),
         keywords=("AnyCancellable", "local", "Set", "store"),
+    ),
+    "comb-never-cancel": MockSnippet(
+        code="""\
+import Combine
+import UIKit
+
+enum Hub {
+    static var bag = Set<AnyCancellable>()
+}
+
+final class Screen: UIViewController {
+    func listen() {
+        Timer.publish(every: 1, on: .main, in: .common)
+            .autoconnect()
+            .sink { _ in print("tick") }
+            .store(in: &Hub.bag)
+    }
+}
+""",
+        bug_summary="The timer subscription is stored on a static bag, so it keeps firing after Screen is gone",
+        bug_category="Combine",
+        difficulty="intermediate",
+        hints=("Store cancellables on Screen and cancel on deinit",),
+        keywords=("AnyCancellable", "static", "Timer", "cancel"),
     ),
 }
 

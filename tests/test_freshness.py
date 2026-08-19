@@ -192,7 +192,7 @@ def test_seed_pool_has_thirty_one_categories_wired_to_mock_and_fallback() -> Non
         "Combine",
     }
     assert len(categories) == 31
-    assert len(SEED_POOL) == 70
+    assert len(SEED_POOL) == 76
     for seed in SEED_POOL:
         assert seed.seed_id in SEED_SNIPPETS
         mock = SEED_SNIPPETS[seed.seed_id]

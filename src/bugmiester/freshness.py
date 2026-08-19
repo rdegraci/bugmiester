@@ -54,6 +54,18 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
         "async work from viewDidLoad without Task",
         "must call async from a sync UIKit entry; not a missing await inside an async function",
     ),
+    ScenarioSeed(
+        "conc-task-orphan",
+        "concurrency",
+        "unstructured Task never cancelled",
+        "must start Task that outlives the owner; not missing await; not MainActor; not a retain-cycle-only puzzle",
+    ),
+    ScenarioSeed(
+        "conc-continuation-stuck",
+        "concurrency",
+        "checked continuation never resumed",
+        "must call withCheckedContinuation and skip resume on a path; not missing await",
+    ),
     ScenarioSeed("acc-mutating-let", "access control", "mutating method on a let value"),
     ScenarioSeed("acc-private-field", "access control", "private property from a free function"),
     ScenarioSeed("ui-state-let", "SwiftUI state", "counter button stored as let"),
@@ -70,6 +82,12 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
         "ForEach over 0..<count",
         "must be ForEach identity; not $ Binding; not @State let",
     ),
+    ScenarioSeed(
+        "ui-onappear-task",
+        "SwiftUI state",
+        "onAppear starts a Task that is not cancelled",
+        "must use onAppear plus Task; not .task; not $ Binding; not ForEach",
+    ),
     ScenarioSeed("cap-stored-self", "captures", "escaping closure stored on self"),
     ScenarioSeed("cap-timer-cycle", "captures", "repeating timer owned by self"),
     ScenarioSeed(
@@ -77,6 +95,12 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
         "captures",
         "URLSession completion on a view controller",
         "must capture self in a URLSession completion stored on the VC; not a Timer; not missing await; not MainActor",
+    ),
+    ScenarioSeed(
+        "cap-notify-observer",
+        "captures",
+        "NotificationCenter observer never removed",
+        "must add a NotificationCenter observer and never remove it; not a Timer; not URLSession",
     ),
     ScenarioSeed("eq-identity-id", "equality", "identity used instead of id equality"),
     ScenarioSeed("eq-missing-protocol", "equality", "class compared with == but not Equatable"),
@@ -211,6 +235,12 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
         "defer",
         "defer captures a value copied too early",
         "must involve defer reading a stale copy",
+    ),
+    ScenarioSeed(
+        "defer-file-handle",
+        "defer",
+        "FileHandle never closed",
+        "must open FileHandle and skip close; not cleanup after return; not a stale defer copy",
     ),
     ScenarioSeed(
         "unowned-self-gone",
@@ -349,6 +379,12 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
         "Combine",
         "cancellables stored in a local Set",
         "must store AnyCancellable in a function-local Set; not a retain cycle; not missing await; not receive(on:)",
+    ),
+    ScenarioSeed(
+        "comb-never-cancel",
+        "Combine",
+        "subscription stored on a longer-lived bag",
+        "must keep a publisher subscribed after the screen is gone; not a local Set; not a dropped sink; not receive(on:)",
     ),
 )
 
