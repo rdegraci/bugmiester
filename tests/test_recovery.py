@@ -10,7 +10,12 @@ from fastapi.testclient import TestClient
 from bugmiester.app import create_app
 from bugmiester.config import ensure_app_dir, load_settings
 from bugmiester.llm.parse import ParseError, parse_recovery_payload
-from bugmiester.recovery import assemble_options, too_close_to_expected
+from bugmiester.recovery import (
+    assemble_options,
+    fill_from_seed_bank,
+    filter_distractors,
+    too_close_to_expected,
+)
 from bugmiester.scoring import score_keyword
 
 
@@ -90,9 +95,61 @@ def test_too_close_rejects_paraphrase() -> None:
         expected,
     ) is True
     assert too_close_to_expected(
+        "Force unwrap of a dictionary value that is nil",
+        expected,
+    ) is True
+    assert too_close_to_expected(
         "Missing await on an async call",
         expected,
     ) is False
+
+
+def test_too_close_keeps_nearby_wrong_claim() -> None:
+    expected = "TextField needs a Binding; missing $ on name"
+    assert too_close_to_expected(
+        "Text displays with a blank username",
+        expected,
+    ) is False
+    assert too_close_to_expected(
+        "Use @Binding instead of @State for username",
+        expected,
+    ) is False
+
+
+def test_filter_distractors_prefers_player_partial() -> None:
+    expected = "TextField needs a Binding; missing $ on name"
+    player = "Text displays with blank username"
+    filtered = filter_distractors(
+        ["Integer overflow when the counter wraps", "Missing await on fetch"],
+        expected,
+        needed=3,
+        player_answer=player,
+    )
+    assert filtered[0] == player
+    assert len(filtered) == 3
+    assert expected not in filtered
+
+
+def test_fill_from_seed_bank_prefers_same_category() -> None:
+    expected = "TextField needs a Binding; missing $ on name"
+    filled = fill_from_seed_bank(
+        expected,
+        [],
+        needed=3,
+        bug_category="SwiftUI state",
+        player_answer="Text displays with blank username",
+    )
+    assert filled[0] == "Text displays with blank username"
+    assert len(filled) == 3
+    from bugmiester.llm.mock_provider import SEED_SNIPPETS
+
+    swiftui = {
+        snip.bug_summary
+        for snip in SEED_SNIPPETS.values()
+        if snip.bug_category == "SwiftUI state"
+        and snip.bug_summary != expected
+    }
+    assert any(item in swiftui for item in filled[1:])
 
 
 def test_assemble_options_shuffles_without_correct_flag() -> None:

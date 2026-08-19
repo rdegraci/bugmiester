@@ -510,14 +510,21 @@ class RoundStore:
                 settings=settings,
             )
             distractors = filter_distractors(
-                raw_list, stored.bug_summary, needed=needed
+                raw_list,
+                stored.bug_summary,
+                needed=needed,
+                player_answer=answer,
             )
         except RecoveryLlmError:
             distractors = []
 
         if len(distractors) < needed and settings.recovery.use_seed_bank_fallback:
             distractors = fill_from_seed_bank(
-                stored.bug_summary, distractors, needed=needed
+                stored.bug_summary,
+                distractors,
+                needed=needed,
+                bug_category=stored.bug_category,
+                player_answer=answer,
             )
         assembled = assemble_options(
             stored.bug_summary,

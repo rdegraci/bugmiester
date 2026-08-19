@@ -46,6 +46,10 @@ def _tokens(text: str) -> set[str]:
     return {t for t in re.split(r"[^a-z0-9+]+", _normalize(text)) if len(t) > 2}
 
 
+# Same-claim rewrites of the official summary (not nearby wrong claims).
+_PARAPHRASE_OVERLAP = 0.72
+
+
 def too_close_to_expected(candidate: str, expected: str) -> bool:
     """True when a distractor is a paraphrase of the real bug summary."""
     cand_n = _normalize(candidate)
@@ -61,23 +65,32 @@ def too_close_to_expected(candidate: str, expected: str) -> bool:
     if not cand_tok or not exp_tok:
         return True
     overlap = len(cand_tok & exp_tok) / len(cand_tok | exp_tok)
-    return overlap >= 0.55
+    if overlap >= _PARAPHRASE_OVERLAP:
+        return True
+    smaller = min(len(cand_tok), len(exp_tok))
+    containment = len(cand_tok & exp_tok) / smaller
+    return containment >= 0.9 and overlap >= 0.4
 
 
-def seed_bank_summaries() -> tuple[str, ...]:
+def seed_bank_entries() -> tuple[tuple[str, str], ...]:
+    """``(bug_summary, bug_category)`` from mock/seed banks, then canned lines."""
     seen: set[str] = set()
-    out: list[str] = []
+    out: list[tuple[str, str]] = []
     for snip in (*MOCK_SNIPPETS, *SEED_SNIPPETS.values()):
         key = _normalize(snip.bug_summary)
         if key and key not in seen:
             seen.add(key)
-            out.append(snip.bug_summary)
+            out.append((snip.bug_summary, snip.bug_category))
     for canned in CANNED_DISTRACTORS:
         key = _normalize(canned)
         if key and key not in seen:
             seen.add(key)
-            out.append(canned)
+            out.append((canned, ""))
     return tuple(out)
+
+
+def seed_bank_summaries() -> tuple[str, ...]:
+    return tuple(summary for summary, _category in seed_bank_entries())
 
 
 def filter_distractors(
@@ -85,28 +98,50 @@ def filter_distractors(
     expected: str,
     *,
     needed: int,
+    player_answer: str = "",
 ) -> list[str]:
     unique: list[str] = []
     seen: set[str] = set()
     expected_key = _normalize(expected)
-    for item in candidates:
-        text = str(item).strip()
+
+    def _try_add(raw: str) -> None:
+        text = str(raw).strip()
         key = _normalize(text)
         if not key or key == expected_key or key in seen:
-            continue
+            return
         if too_close_to_expected(text, expected):
-            continue
+            return
         seen.add(key)
         unique.append(text)
+
+    if player_answer.strip():
+        _try_add(player_answer)
+    for item in candidates:
         if len(unique) >= needed:
             break
-    return unique
+        _try_add(item)
+    return unique[:needed]
 
 
-def fill_from_seed_bank(expected: str, already: list[str], *, needed: int) -> list[str]:
-    have = list(already)
+def fill_from_seed_bank(
+    expected: str,
+    already: list[str],
+    *,
+    needed: int,
+    bug_category: str | None = None,
+    player_answer: str = "",
+) -> list[str]:
+    have = filter_distractors(
+        already, expected, needed=needed, player_answer=player_answer
+    )
     have_keys = {_normalize(x) for x in have}
-    for summary in seed_bank_summaries():
+    cat = (bug_category or "").strip().lower()
+    entries = list(seed_bank_entries())
+    if cat:
+        same = [entry for entry in entries if entry[1].strip().lower() == cat]
+        other = [entry for entry in entries if entry[1].strip().lower() != cat]
+        entries = same + other
+    for summary, _category in entries:
         if len(have) >= needed:
             break
         key = _normalize(summary)

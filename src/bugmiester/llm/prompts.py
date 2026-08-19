@@ -116,6 +116,8 @@ def build_recovery_prompt(
     n = max(1, distractor_count)
     return f"""You write wrong multiple-choice answers for a Swift bug-spotting game.
 
+The player already has partial credit. The quiz tests a precise reading of THIS bug, not a different bug class.
+
 Swift code:
 ```
 {code}
@@ -124,15 +126,17 @@ Swift code:
 The ONE real bug is:
 {expected_summary}
 
-Player partial answer (do not reuse this as a choice):
+Player partial answer (you may use this as one wrong choice if it is a different claim; do not copy the real bug):
 {player_answer}
 
 Return ONLY valid JSON with this key:
 - "distractors": array of exactly {n} strings
 
 Rules:
-- Each distractor names a DIFFERENT defect a reader might believe is in this code.
-- Do not paraphrase the real bug.
+- Each distractor is an incorrect variant of this same bug: a nearby misreading of this feature or this snippet.
+- Use a wrong mechanism, a wrong location, or a true fact that is not the bug (for example initial empty state).
+- Do not name a different bug class (retain cycle, integer overflow, missing await) unless that class is the real bug.
+- Do not paraphrase the real bug. The same claim in different words is not a distractor.
 - One short sentence each.
 - No numbering, no labels like "A)" or "wrong".
 """

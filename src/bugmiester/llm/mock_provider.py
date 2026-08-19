@@ -698,8 +698,10 @@ class MockProvider:
         )
 
     def recovery_raw(self, prompt: str, settings: Settings | None = None) -> str:
-        """Wrong-answer summaries from other canned snippets (no network)."""
+        """Near-miss wrong answers; prefers the player's partial, then other snippets."""
         del settings
+        from bugmiester.recovery import too_close_to_expected
+
         needed = 3
         count_match = re.search(r"exactly (\d+) strings", prompt, flags=re.I)
         if count_match:
@@ -711,13 +713,33 @@ class MockProvider:
         )
         if expected_match:
             expected = expected_match.group(1).strip()
+        player = ""
+        player_match = re.search(
+            r"Player partial answer[^\n]*:\n([\s\S]*?)\n\nReturn ONLY",
+            prompt,
+        )
+        if player_match:
+            player = player_match.group(1).strip()
         distractors: list[str] = []
         seen = {expected.strip().lower()}
+        if player and not too_close_to_expected(player, expected):
+            distractors.append(player)
+            seen.add(player.strip().lower())
+        expected_category = ""
+        for snip in self._seed_map.values():
+            if snip.bug_summary.strip() == expected:
+                expected_category = snip.bug_category
+                break
         bank = list(self._snippets) + list(self._seed_map.values())
+        if expected_category:
+            bank = sorted(
+                bank,
+                key=lambda snip: 0 if snip.bug_category == expected_category else 1,
+            )
         for snip in bank:
             summary = snip.bug_summary.strip()
             key = summary.lower()
-            if key in seen:
+            if key in seen or too_close_to_expected(summary, expected):
                 continue
             seen.add(key)
             distractors.append(summary)

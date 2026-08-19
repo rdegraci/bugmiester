@@ -16,7 +16,11 @@ from bugmiester.llm import generate_bug, judge_answer
 from bugmiester.llm.base import JudgeResult, SnippetWithKey
 from bugmiester.llm.mock_provider import MockProvider
 from bugmiester.llm.parse import ParseError, parse_generation_payload, parse_judge_payload
-from bugmiester.llm.prompts import build_generation_prompt, build_judge_prompt
+from bugmiester.llm.prompts import (
+    build_generation_prompt,
+    build_judge_prompt,
+    build_recovery_prompt,
+)
 
 
 def test_parse_generation_requires_keys() -> None:
@@ -79,6 +83,20 @@ def test_prompts_include_seed_and_avoid_list() -> None:
     assert "Force unwrap" in judge_prompt
     assert "force unwrap" in judge_prompt
     assert "confidence" in judge_prompt
+
+
+def test_recovery_prompt_asks_for_near_misses() -> None:
+    prompt = build_recovery_prompt(
+        code="TextField(\"Name\", text: name)",
+        expected_summary="TextField needs a Binding; missing $ on name",
+        player_answer="Text displays with blank username",
+        distractor_count=3,
+    )
+    assert "incorrect variant" in prompt
+    assert "Do not paraphrase the real bug" in prompt
+    assert "different bug class" in prompt
+    assert "Text displays with blank username" in prompt
+    assert "exactly 3 strings" in prompt
 
 
 def test_invalid_mock_json_consumes_shared_attempts() -> None:
