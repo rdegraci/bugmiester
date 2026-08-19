@@ -57,6 +57,7 @@ Rules:
 - The bug must fit this seed's category. Do not substitute a generic force-unwrap or missing await unless the category requires it.
 - No multiple interacting defects.
 - The JSON "code" must contain the bug. Do not return the correct snippet.
+- "code" must contain no comments (no //, no /* */, no ///). Do not label the bug in the source. Put any hint only in "hints".
 - "bug_summary" is one short sentence that names the defect. Not a tutorial. Not the fix.
 - Short enough to read on one screen.
 - Do NOT reuse or near-duplicate anything on the avoid-list.

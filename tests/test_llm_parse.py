@@ -44,6 +44,42 @@ def test_parse_generation_happy_path() -> None:
     assert snippet.keywords == ("force unwrap", "nil")
 
 
+def test_parse_generation_strips_comments_keeps_url_strings() -> None:
+    snippet = parse_generation_payload(
+        {
+            "code": """\
+func load(_ url: URL) {
+    // missing await on purpose
+    let text = fetch() /* async */
+    return URL(string: "https://example.com")!
+}
+""",
+            "bug_summary": "Force unwrap of URL(string:)",
+            "bug_category": "failable init",
+            "difficulty": "beginner",
+            "hints": ["URL(string:) is optional"],
+        }
+    )
+    assert "//" not in snippet.code.replace("https://", "")
+    assert "/*" not in snippet.code
+    assert "missing await" not in snippet.code
+    assert "async" not in snippet.code
+    assert "https://example.com" in snippet.code
+
+
+def test_parse_generation_rejects_comment_only_code() -> None:
+    with pytest.raises(ParseError, match="non-empty"):
+        parse_generation_payload(
+            {
+                "code": "// the bug is a force unwrap\n/* leftover */",
+                "bug_summary": "Force unwrap",
+                "bug_category": "optionals",
+                "difficulty": "beginner",
+                "hints": ["!"],
+            }
+        )
+
+
 def test_parse_generation_rejects_invalid_json() -> None:
     with pytest.raises(ParseError, match="Invalid JSON"):
         parse_generation_payload("not-json{")
@@ -71,6 +107,7 @@ def test_prompts_include_seed_and_avoid_list() -> None:
     assert "correct" in prompt and "language feature" in prompt
     assert "Do not return the correct snippet" in prompt
     assert "Not a tutorial" in prompt
+    assert "must contain no comments" in prompt
     assert "failure mode" in prompt
     assert seed.seed_id in prompt
     assert "bug_summary" in prompt

@@ -85,6 +85,52 @@ def _as_keywords(value: Any) -> tuple[str, ...]:
     return tuple(words)
 
 
+def strip_source_comments(code: str) -> str:
+    """Remove // and /* */ comments from Swift-like source for the player board.
+
+    Leaves ``//`` inside double-quoted strings (e.g. https:// URLs).
+    """
+    text = re.sub(r"/\*.*?\*/", "", code, flags=re.DOTALL)
+    kept: list[str] = []
+    for line in text.splitlines():
+        cleaned = _strip_line_comment(line).rstrip()
+        if not cleaned.strip():
+            if kept and kept[-1] != "":
+                kept.append("")
+            continue
+        kept.append(cleaned)
+    while kept and kept[-1] == "":
+        kept.pop()
+    while kept and kept[0] == "":
+        kept.pop(0)
+    return "\n".join(kept)
+
+
+def _strip_line_comment(line: str) -> str:
+    in_string = False
+    escape = False
+    i = 0
+    while i < len(line):
+        ch = line[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            i += 1
+            continue
+        if ch == '"':
+            in_string = True
+            i += 1
+            continue
+        if ch == "/" and i + 1 < len(line) and line[i + 1] == "/":
+            return line[:i]
+        i += 1
+    return line
+
+
 def _one_bug_smell(code: str, summary: str) -> None:
     """Reject obvious multi-bug / oversized payloads (light MVP checks)."""
     if len(code) > 4000:
@@ -104,7 +150,9 @@ def parse_generation_payload(raw: str | dict[str, Any]) -> SnippetWithKey:
     if missing:
         raise ParseError(f"Missing required keys: {', '.join(missing)}")
 
-    code = _as_nonempty_str(data["code"], "code")
+    code = strip_source_comments(_as_nonempty_str(data["code"], "code"))
+    if not code.strip():
+        raise ParseError("'code' must be non-empty")
     bug_summary = _as_nonempty_str(data["bug_summary"], "bug_summary")
     bug_category = _as_nonempty_str(data["bug_category"], "bug_category")
     difficulty = _as_nonempty_str(data["difficulty"], "difficulty").lower()
