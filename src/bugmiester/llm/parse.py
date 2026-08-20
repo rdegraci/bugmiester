@@ -16,9 +16,9 @@ REQUIRED_GENERATION_KEYS = (
     "hints",
 )
 
-# Soft target in the generate prompt is ~25–40 lines; hard reject above this.
+# Soft target in the generate prompt is ~30–45 lines; hard reject above this.
 MAX_CODE_LINES = 60
-MAX_CODE_CHARS = 4000
+MAX_CODE_CHARS = 8192
 
 
 class ParseError(ValueError):

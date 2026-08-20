@@ -61,10 +61,12 @@ Rules:
 - Stealth (required): the snippet must look like ordinary production {language} if the bug were fixed. Do not telegraph the defect.
 - No puzzle tells: no suspicious names (e.g. unsafe, force, bug, broken, wrong), no dead decoy lines, no "look here" structure, no contrived one-liner that exists only to showcase the bug.
 - Bury the defect in a short stretch of normal surrounding logic (a few innocent lines or a realistic call path) while staying one screen. Prefer bugs that require reading how pieces interact, not spotting one glaring token in isolation — still honor the seed constraint.
-- Length: prefer about 25–40 lines of {language}. Aim under 40 lines; never exceed 60 lines.
-- No multiple interacting defects.
+- Red herring (encouraged): include at most ONE nearby lookalike that appears suspicious but is actually correct / safe / intentional in context (for example a force-unwrap after a guaranteed non-nil check, or a correct await). It must not be a second real defect.
+- Still exactly ONE real bug. "bug_summary" and "keywords" must describe only that real bug — never the red herring.
+- Length: prefer about 30–45 lines of {language}. Aim under 45 lines; never exceed 60 lines.
+- No multiple interacting defects (the red herring does not count as a bug).
 - The JSON "code" must contain the bug. Do not return the correct snippet.
-- "code" must contain no comments (no //, no /* */, no ///). Do not label the bug in the source. Put any hint only in "hints".
+- "code" must contain no comments (no //, no /* */, no ///). Do not label the bug or the red herring in the source. Put any hint only in "hints".
 - "bug_summary" is one short sentence that names the defect. Not a tutorial. Not the fix.
 - Short enough to read carefully in under a minute (one screen on a laptop).
 - Do NOT reuse or near-duplicate anything on the avoid-list.
@@ -94,24 +96,27 @@ def build_judge_prompt(
 
 Use a careful, generous rubric: prefer partial credit over a harsh wrong when unsure.
 
+The snippet may include a red herring: code that looks suspicious but is not the intended bug. Only the expected bug summary below counts as correct.
+
 Swift code:
 ```
 {code}
 ```
 
-Expected bug summary:
+Expected bug summary (the ONE real bug):
 {expected_summary}
 
 Player answer:
 {player_answer}
 
 Return ONLY valid JSON with these keys:
-- "correct": boolean (true only if the player clearly named the intended bug)
-- "partial": boolean (true for incomplete but on-track answers; false if correct)
+- "correct": boolean (true only if the player clearly named the intended bug above)
+- "partial": boolean (true for incomplete but on-track answers about that same bug; false if correct)
 - "give_up": boolean (true if the player is declining to guess — e.g. "I don't know", "no clue", "beats me", "pass" — not a real bug hypothesis)
 - "feedback": string (short verdict only, e.g. "Yes." / "Partially correct." / "Not quite." — do not repeat the expected bug summary; use "" when give_up is true)
 - "confidence": number from 0.0 to 1.0
 
+If the player only names a red herring / lookalike and misses the expected bug, mark correct=false and partial=false.
 If give_up is true, set correct and partial to false.
 """
 

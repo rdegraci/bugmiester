@@ -158,8 +158,9 @@ def test_prompts_include_seed_and_avoid_list() -> None:
     assert "Keep the same bug class; change the costume" in prompt
     assert "Stealth (required)" in prompt
     assert "No puzzle tells" in prompt
+    assert "Red herring" in prompt
     assert "never exceed 60 lines" in prompt
-    assert "25–40 lines" in prompt or "25-40 lines" in prompt
+    assert "30–45 lines" in prompt or "30-45 lines" in prompt
     assert seed.seed_id in prompt
     assert "bug_summary" in prompt
 
@@ -172,6 +173,7 @@ def test_prompts_include_seed_and_avoid_list() -> None:
     assert "force unwrap" in judge_prompt
     assert "confidence" in judge_prompt
     assert "give_up" in judge_prompt
+    assert "red herring" in judge_prompt.lower()
 
 
 def test_recovery_prompt_asks_for_near_misses() -> None:
