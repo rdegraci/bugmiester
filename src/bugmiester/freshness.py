@@ -66,6 +66,18 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
         "checked continuation never resumed",
         "must call withCheckedContinuation and skip resume on a path; not missing await",
     ),
+    ScenarioSeed(
+        "conc-task-loop",
+        "concurrency",
+        "unstructured Task inside a for-loop",
+        "must spawn Task in a loop instead of withTaskGroup; not a single orphaned Task; not missing await on one call",
+    ),
+    ScenarioSeed(
+        "conc-async-let",
+        "concurrency",
+        "async let results used without await",
+        "must use async let and skip await; not a plain missing await; not TaskGroup",
+    ),
     ScenarioSeed("acc-mutating-let", "access control", "mutating method on a let value"),
     ScenarioSeed("acc-private-field", "access control", "private property from a free function"),
     ScenarioSeed("ui-state-let", "SwiftUI state", "counter button stored as let"),

@@ -286,6 +286,39 @@ func wait() async {
         hints=("Resume the continuation on every path",),
         keywords=("continuation", "resume", "hang", "leak"),
     ),
+    "conc-task-loop": MockSnippet(
+        code="""\
+func prefetch(_ urls: [URL]) async {
+    for url in urls {
+        Task {
+            await load(url)
+        }
+    }
+}
+func load(_ url: URL) async {}
+""",
+        bug_summary="Each iteration starts an unstructured Task, so prefetch returns before the loads finish",
+        bug_category="concurrency",
+        difficulty="intermediate",
+        hints=("Use withTaskGroup or async let",),
+        keywords=("Task", "loop", "TaskGroup", "unstructured"),
+    ),
+    "conc-async-let": MockSnippet(
+        code="""\
+func pair() async -> (String, String) {
+    async let a = fetchA()
+    async let b = fetchB()
+    return (a, b)
+}
+func fetchA() async -> String { "a" }
+func fetchB() async -> String { "b" }
+""",
+        bug_summary="async let values are returned without await",
+        bug_category="concurrency",
+        difficulty="intermediate",
+        hints=("await a and await b",),
+        keywords=("async let", "await", "missing", "tuple"),
+    ),
     "acc-mutating-let": MockSnippet(
         code="""\
 struct Counter {

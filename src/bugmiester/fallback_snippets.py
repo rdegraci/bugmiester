@@ -233,6 +233,39 @@ func fetch(_ url: URL) async -> Data {
         hints=("Resume on the failure path too",),
         keywords=("continuation", "resume", "nil", "hang"),
     ),
+    "conc-task-loop": MockSnippet(
+        code="""\
+func warmup(_ ids: [Int]) async {
+    for id in ids {
+        Task.detached {
+            await spin(id)
+        }
+    }
+}
+func spin(_ id: Int) async {}
+""",
+        bug_summary="Task.detached in a loop is unstructured; warmup ends while spin still runs",
+        bug_category="concurrency",
+        difficulty="intermediate",
+        hints=("withTaskGroup so the parent waits",),
+        keywords=("Task.detached", "loop", "TaskGroup", "unstructured"),
+    ),
+    "conc-async-let": MockSnippet(
+        code="""\
+func total() async -> Int {
+    async let x = left()
+    async let y = right()
+    return x + y
+}
+func left() async -> Int { 1 }
+func right() async -> Int { 2 }
+""",
+        bug_summary="x and y are async let bindings; adding them needs await",
+        bug_category="concurrency",
+        difficulty="intermediate",
+        hints=("await x + await y",),
+        keywords=("async let", "await", "missing", "Int"),
+    ),
     "acc-mutating-let": MockSnippet(
         code="""\
 extension Int {
