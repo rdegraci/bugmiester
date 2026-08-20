@@ -8,6 +8,7 @@
     bugsPerRound: document.getElementById("bugs-per-round"),
     roundScore: document.getElementById("round-score"),
     roundPossible: document.getElementById("round-possible"),
+    difficultyScale: document.getElementById("difficulty-scale"),
     progressStatus: document.getElementById("progress-status"),
     progressSpinner: document.getElementById("progress-spinner"),
     progressText: document.getElementById("progress-text"),
@@ -49,6 +50,7 @@
     reportedCurrent: false,
     recoveryOpen: false,
     prefetchEnabled: true,
+    mix: "senior_mix",
     prefetch: {
       token: 0,
       roundId: null,
@@ -99,6 +101,42 @@
     return msg;
   }
 
+  function difficultyLabelFromIndex(index, bugs) {
+    const n = bugs || 10;
+    const slop = n <= 1 ? 0 : n < 8 ? 1 : 2;
+    const gnarly = n >= 10 ? 2 : n >= 8 ? 1 : 0;
+    if (index < slop) {
+      return "Simple";
+    }
+    if (gnarly && index >= n - gnarly) {
+      return "Gnarly";
+    }
+    return "Common";
+  }
+
+  function updateDifficultyChrome(data) {
+    if (typeof data.mix === "string" && data.mix) {
+      state.mix = data.mix;
+    }
+    let label = "Simple";
+    if (typeof data.difficulty_label === "string" && data.difficulty_label) {
+      label = data.difficulty_label;
+    } else if (typeof data.index === "number") {
+      label = difficultyLabelFromIndex(data.index, bugsPerRound());
+    }
+    const root = els.difficultyScale;
+    if (!root) {
+      return;
+    }
+    const parts = root.querySelectorAll("[data-band]");
+    for (let i = 0; i < parts.length; i += 1) {
+      parts[i].classList.toggle(
+        "is-current",
+        parts[i].getAttribute("data-band") === label
+      );
+    }
+  }
+
   function updateRoundChrome(data) {
     if (typeof data.bugs_per_round === "number") {
       els.bugsPerRound.textContent = String(data.bugs_per_round);
@@ -116,6 +154,7 @@
           : Math.min(data.index, bugsPerRound());
       els.bugIndex.textContent = String(display);
     }
+    updateDifficultyChrome(data);
   }
 
   function setBusy(busy) {
@@ -832,6 +871,9 @@
       state.configReady = Boolean(data.config_ready);
       if (typeof data.prefetch_next_bug === "boolean") {
         state.prefetchEnabled = data.prefetch_next_bug;
+      }
+      if (typeof data.mix === "string" && data.mix) {
+        updateDifficultyChrome({ mix: data.mix });
       }
       if (data && data.config_ready === false) {
         showSetupFromHealth(data);

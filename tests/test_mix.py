@@ -6,8 +6,10 @@ from bugmiester.freshness import SEED_POOL, pick_seed
 from bugmiester.mix import (
     BEGINNER_MIX_CATEGORIES,
     DEFAULT_MIX,
-    SENIOR_MIX_CATEGORIES,
+    SENIOR_CORE_CATEGORIES,
     SLOP_MIX_CATEGORIES,
+    difficulty_label,
+    is_gnarly_seed,
     normalize_mix,
     slop_quota,
 )
@@ -21,9 +23,9 @@ def test_normalize_mix_defaults_unknown_to_senior() -> None:
     assert normalize_mix(None) == DEFAULT_MIX
 
 
-def test_senior_mix_fills_senior_then_slop() -> None:
+def test_senior_mix_ramps_slop_then_senior_then_gnarly() -> None:
     used: set[str] = set()
-    cats: list[str] = []
+    seeds = []
     for _ in range(10):
         seed = pick_seed(
             SEED_POOL,
@@ -32,12 +34,29 @@ def test_senior_mix_fills_senior_then_slop() -> None:
             bugs_per_round=10,
         )
         used.add(seed.seed_id)
-        cats.append(seed.category)
+        seeds.append(seed)
     quota = slop_quota(10)
     assert quota == 2
-    assert all(cat in SENIOR_MIX_CATEGORIES for cat in cats[:-quota])
-    assert all(cat in SLOP_MIX_CATEGORIES for cat in cats[-quota:])
-    assert len(set(cats)) == 10
+    assert all(seed.category in SLOP_MIX_CATEGORIES for seed in seeds[:quota])
+    assert all(
+        seed.category in SENIOR_CORE_CATEGORIES for seed in seeds[quota:-2]
+    )
+    assert all(is_gnarly_seed(seed) for seed in seeds[-2:])
+    assert seeds[-2].seed_id == "conc-continuation-stuck"
+    assert seeds[-1].seed_id == "actor-await-stale"
+    assert len({seed.category for seed in seeds}) == 10
+    assert [difficulty_label("senior_mix", i, 10) for i in range(10)] == [
+        "Simple",
+        "Simple",
+        "Common",
+        "Common",
+        "Common",
+        "Common",
+        "Common",
+        "Common",
+        "Gnarly",
+        "Gnarly",
+    ]
 
 
 def test_beginner_mix_prefers_language_gotchas() -> None:
@@ -65,3 +84,5 @@ def test_intermediate_mix_is_unweighted() -> None:
         bugs_per_round=10,
     )
     assert seed.seed_id == SEED_POOL[0].seed_id
+    assert difficulty_label("intermediate_mix", 0, 10) == ""
+    assert difficulty_label("beginner_mix", 8, 10) == ""

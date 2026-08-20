@@ -54,6 +54,27 @@ SLOP_MIX_CATEGORIES = frozenset(
     }
 )
 
+# Held out of the middle of a senior round so slots 9–10 can use them.
+GNARLY_CATEGORIES = frozenset(
+    {
+        "actor reentrancy",
+        "exclusivity",
+        "concurrency",
+    }
+)
+
+GNARLY_SEED_IDS = frozenset({"conc-continuation-stuck"})
+
+SENIOR_CORE_CATEGORIES = frozenset(
+    SENIOR_MIX_CATEGORIES - GNARLY_CATEGORIES
+)
+
+BAND_LABELS = {
+    "slop": "Simple",
+    "senior": "Common",
+    "gnarly": "Gnarly",
+}
+
 
 def normalize_mix(raw: object) -> str:
     name = str(raw or DEFAULT_MIX).strip().lower()
@@ -69,6 +90,42 @@ def slop_quota(bugs_per_round: int) -> int:
     if bugs_per_round < 8:
         return 1
     return 2
+
+
+def gnarly_quota(bugs_per_round: int) -> int:
+    """How many end-of-round gnarly costumes to reserve in a senior round."""
+    if bugs_per_round >= 10:
+        return 2
+    if bugs_per_round >= 8:
+        return 1
+    return 0
+
+
+def senior_phase(used_count: int, bugs_per_round: int) -> str:
+    """slop → senior core → gnarly, by 0-based index in the round."""
+    slop = slop_quota(bugs_per_round)
+    gnarly = gnarly_quota(bugs_per_round)
+    if used_count < slop:
+        return "slop"
+    if gnarly and used_count >= bugs_per_round - gnarly:
+        return "gnarly"
+    return "senior"
+
+
+def is_gnarly_seed(seed: object) -> bool:
+    """Reentrancy, exclusivity, or the stuck-continuation costume."""
+    seed_id = getattr(seed, "seed_id", None)
+    if seed_id in GNARLY_SEED_IDS:
+        return True
+    category = getattr(seed, "category", None)
+    return category in {"actor reentrancy", "exclusivity"}
+
+
+def difficulty_label(mix: object, index: int, bugs_per_round: int) -> str:
+    """Player-facing band for the current bug, or empty when the mix does not ramp."""
+    if normalize_mix(mix) != "senior_mix":
+        return ""
+    return BAND_LABELS[senior_phase(index, bugs_per_round)]
 
 
 def preferred_categories(
@@ -88,15 +145,9 @@ def preferred_categories(
     if profile == "beginner_mix":
         return BEGINNER_MIX_CATEGORIES
 
-    used_count = len(used_seeds)
-    remaining = max(0, bugs_per_round - used_count)
-    quota = slop_quota(bugs_per_round)
-    slop_picked = sum(
-        1
-        for seed in used_seeds
-        if getattr(seed, "category", None) in SLOP_MIX_CATEGORIES
-    )
-    slop_needed = max(0, quota - slop_picked)
-    if slop_needed > 0 and remaining <= slop_needed:
+    phase = senior_phase(len(used_seeds), bugs_per_round)
+    if phase == "slop":
         return SLOP_MIX_CATEGORIES
-    return SENIOR_MIX_CATEGORIES
+    if phase == "gnarly":
+        return GNARLY_CATEGORIES
+    return SENIOR_CORE_CATEGORIES

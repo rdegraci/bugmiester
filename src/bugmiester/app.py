@@ -45,6 +45,7 @@ def health_payload(settings: Settings) -> dict:
         "missing_key": settings.missing_key,
         "message": message,
         "prefetch_next_bug": bool(settings.resilience.prefetch_next_bug),
+        "mix": settings.game.mix,
     }
 
 
@@ -257,7 +258,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/")
     def game_index() -> FileResponse:
-        return FileResponse(static_root / "index.html")
+        return FileResponse(
+            static_root / "index.html",
+            headers={"Cache-Control": "no-store"},
+        )
 
     @app.get("/ops")
     def ops_dashboard() -> FileResponse:

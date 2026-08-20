@@ -13,6 +13,8 @@ class RoundStartResponse(BaseModel):
     index: int
     round_score: int
     round_possible: int
+    mix: str = "senior_mix"
+    difficulty_label: str = ""
 
 
 class NextBugRequest(BaseModel):
@@ -28,6 +30,8 @@ class NextBugResponse(BaseModel):
     code: str
     difficulty: str
     degraded: bool = False
+    mix: str = "senior_mix"
+    difficulty_label: str = ""
 
 
 class SubmitRequest(BaseModel):
@@ -98,6 +102,8 @@ class RoundResumeResponse(BaseModel):
     language: str = "swift"
     code: str = ""
     difficulty: str = ""
+    mix: str = "senior_mix"
+    difficulty_label: str = ""
     degraded: bool = False
     answered: bool = False
     player_answer: str = ""

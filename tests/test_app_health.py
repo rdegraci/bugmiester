@@ -74,6 +74,7 @@ def test_health_mock_ready(tmp_path: Path, monkeypatch) -> None:
     assert data["provider"] == "mock"
     assert data["missing_key"] is None
     assert data["prefetch_next_bug"] is True
+    assert data["mix"] == "senior_mix"
 
 
 def test_serves_index_and_ops_and_vendor(tmp_path: Path, monkeypatch) -> None:
@@ -91,6 +92,10 @@ def test_serves_index_and_ops_and_vendor(tmp_path: Path, monkeypatch) -> None:
 
     assert index.status_code == 200
     assert b"Bugmiester" in index.content
+    assert b"Difficulty:" in index.content
+    assert b"Simple" in index.content
+    assert b"Common" in index.content
+    assert b"Gnarly" in index.content
     assert ops.status_code == 200
     assert b"Bugmiester Ops" in ops.content
     assert css.status_code == 200

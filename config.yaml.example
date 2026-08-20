@@ -14,7 +14,7 @@ game:
   bugs_per_round: 10
   language: swift
   # beginner_mix | intermediate_mix | senior_mix
-  # senior_mix weights isolation/SwiftUI/Combine and keeps 1–2 slop bugs
+  # senior_mix ramps Simple slop → Common senior → Gnarly (reentrancy, continuation, exclusivity)
   mix: senior_mix
 
 scoring:

@@ -51,6 +51,19 @@ def test_full_mock_round_no_answer_key_leak(tmp_path: Path, monkeypatch) -> None
                 "/api/round/next-bug", json={"round_id": round_id}
             ).json()
             assert bug["index"] == i
+            assert bug["mix"] == "senior_mix"
+            assert bug["difficulty_label"] == [
+                "Simple",
+                "Simple",
+                "Common",
+                "Common",
+                "Common",
+                "Common",
+                "Common",
+                "Common",
+                "Gnarly",
+                "Gnarly",
+            ][i]
             assert "bug_summary" not in bug
             assert "hints" not in bug
             assert "keywords" not in bug

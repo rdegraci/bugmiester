@@ -10,7 +10,13 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from bugmiester.llm.parse import ParseError
-from bugmiester.mix import preferred_categories
+from bugmiester.mix import (
+    GNARLY_SEED_IDS,
+    is_gnarly_seed,
+    normalize_mix,
+    preferred_categories,
+    senior_phase,
+)
 
 
 @dataclass(frozen=True)
@@ -613,11 +619,31 @@ def pick_seed(
     prefer = preferred_categories(
         mix, used_seeds, bugs_per_round=bugs_per_round
     )
+    gnarly_only = (
+        normalize_mix(mix) == "senior_mix"
+        and senior_phase(len(used_seeds), bugs_per_round) == "gnarly"
+    )
+
+    def _preferred(candidates: list[ScenarioSeed]) -> list[ScenarioSeed]:
+        matched = [seed for seed in candidates if seed.category in prefer]
+        if gnarly_only:
+            matched = [seed for seed in matched if is_gnarly_seed(seed)]
+            matched.sort(
+                key=lambda seed: (
+                    0
+                    if seed.seed_id in GNARLY_SEED_IDS
+                    else 1
+                    if seed.category == "actor reentrancy"
+                    else 2
+                )
+            )
+        return matched
+
     if prefer:
-        prefer_under = [seed for seed in under_cap if seed.category in prefer]
+        prefer_under = _preferred(under_cap)
         if prefer_under:
             return prefer_under[0]
-        prefer_unused = [seed for seed in unused if seed.category in prefer]
+        prefer_unused = _preferred(unused)
         if prefer_unused:
             return prefer_unused[0]
     if under_cap:

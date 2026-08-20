@@ -25,6 +25,7 @@ from bugmiester.llm.anthropic_provider import (
 from bugmiester.llm.grok_provider import GrokConfigError, GrokRequestError
 from bugmiester.llm.openai_provider import OpenAIConfigError, OpenAIRequestError
 from bugmiester.metrics import MetricsCollector
+from bugmiester.mix import difficulty_label
 from bugmiester.models import (
     NextBugResponse,
     ReportSnippetResponse,
@@ -192,6 +193,8 @@ class RoundStore:
             index=0,
             round_score=0,
             round_possible=bugs * points,
+            mix=state.seed_mix,
+            difficulty_label="",
         )
 
     def get(self, round_id: str) -> RoundState | None:
@@ -261,6 +264,10 @@ class RoundStore:
             code=stored.code,
             difficulty=stored.difficulty,
             degraded=stored.degraded,
+            mix=state.seed_mix,
+            difficulty_label=difficulty_label(
+                state.seed_mix, stored.index, state.bugs_per_round
+            ),
         )
 
     def resume(
@@ -297,6 +304,8 @@ class RoundStore:
                 round_possible=state.bugs_per_round * state.points_per_bug,
                 index=0,
                 round_complete=state.complete,
+                mix=state.seed_mix,
+                difficulty_label="",
                 pending=pending_public,
                 summary=self._summary_if_complete(state, state.complete),
             )
@@ -332,6 +341,10 @@ class RoundStore:
             language=target.language,
             code=target.code,
             difficulty=target.difficulty,
+            mix=state.seed_mix,
+            difficulty_label=difficulty_label(
+                state.seed_mix, target.index, state.bugs_per_round
+            ),
             degraded=target.degraded,
             answered=answered,
             player_answer=target.player_answer if answered else "",
@@ -364,6 +377,10 @@ class RoundStore:
             code=stored.code,
             difficulty=stored.difficulty,
             degraded=stored.degraded,
+            mix=state.seed_mix,
+            difficulty_label=difficulty_label(
+                state.seed_mix, stored.index, state.bugs_per_round
+            ),
         )
 
     def _store_generated(

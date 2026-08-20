@@ -30,6 +30,15 @@ body {
   color: var(--bm-muted) !important;
 }
 
+.difficulty-scale {
+  color: var(--bm-muted);
+}
+
+.difficulty-scale [data-band].is-current {
+  color: var(--bm-accent) !important;
+  font-weight: 600;
+}
+
 .code-well {
   background: var(--bm-code);
   border: 1px solid var(--bm-line);

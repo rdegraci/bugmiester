@@ -2,10 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta http-equiv="Cache-Control" content="no-store" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Bugmiester</title>
     <link rel="stylesheet" href="vendor/bootstrap/bootstrap.min.css" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=20260819e" />
   </head>
   <body class="d-flex flex-column min-vh-100">
     <main class="container py-4 flex-grow-1">
@@ -29,6 +30,17 @@
           Bug <span id="bug-index">0</span> / <span id="bugs-per-round">10</span>
           · Score <span id="round-score">0</span> /
           <span id="round-possible">100</span>
+          · Difficulty:
+          <span
+            id="difficulty-scale"
+            class="difficulty-scale"
+          >
+            <span data-band="Simple" class="is-current">Simple</span>
+            ·
+            <span data-band="Common">Common</span>
+            ·
+            <span data-band="Gnarly">Gnarly</span>
+          </span>
         </div>
         <div id="progress-status" class="text-secondary small d-flex align-items-center gap-2" aria-live="polite">
           <span
@@ -174,6 +186,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="app.js"></script>
+    <script src="app.js?v=20260819e"></script>
   </body>
 </html>
