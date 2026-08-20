@@ -9,6 +9,7 @@
     roundScore: document.getElementById("round-score"),
     roundPossible: document.getElementById("round-possible"),
     difficultyScale: document.getElementById("difficulty-scale"),
+    difficultyRampNote: document.getElementById("difficulty-ramp-note"),
     progressStatus: document.getElementById("progress-status"),
     progressSpinner: document.getElementById("progress-spinner"),
     progressText: document.getElementById("progress-text"),
@@ -118,6 +119,7 @@
     if (typeof data.mix === "string" && data.mix) {
       state.mix = data.mix;
     }
+    setHidden(els.difficultyRampNote, state.mix !== "senior_mix");
     let label = "Simple";
     if (typeof data.difficulty_label === "string" && data.difficulty_label) {
       label = data.difficulty_label;

@@ -96,6 +96,51 @@ def _response_format(name: str, schema: dict[str, Any], *, use_schema: bool) -> 
     return {"type": "json_object"}
 
 
+def _omit_temperature(model: str) -> bool:
+    """GPT-5 / reasoning models only accept the default temperature."""
+    name = (model or "").strip().lower().replace("_", "-")
+    return (
+        name.startswith("gpt-5")
+        or name.startswith("o1")
+        or name.startswith("o3")
+        or name.startswith("o4")
+    )
+
+
+def _temperature_rejected(exc: BaseException) -> bool:
+    message = str(exc).lower()
+    return "temperature" in message and (
+        "unsupported" in message
+        or "does not support" in message
+        or "only the default" in message
+        or "invalid_request" in message
+        or "unsupported_value" in message
+    )
+
+
+def _completions_create(client: Any, kwargs: dict[str, Any]) -> Any:
+    try:
+        return client.chat.completions.create(**kwargs)
+    except OpenAIConfigError:
+        raise
+    except OpenAIRequestError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        if "temperature" in kwargs and _temperature_rejected(exc):
+            retry = {key: value for key, value in kwargs.items() if key != "temperature"}
+            try:
+                return client.chat.completions.create(**retry)
+            except OpenAIConfigError:
+                raise
+            except OpenAIRequestError:
+                raise
+            except Exception as retry_exc:  # noqa: BLE001
+                raise OpenAIRequestError(
+                    f"OpenAI request failed: {retry_exc}"
+                ) from retry_exc
+        raise
+
+
 def _chat_json(
     settings: Settings,
     *,
@@ -119,12 +164,16 @@ def _chat_json(
     last_error: Exception | None = None
     for use_schema in (True, False):
         try:
-            response = client.chat.completions.create(
-                model=model,
-                temperature=temperature,
-                response_format=_response_format(schema_name, schema, use_schema=use_schema),
-                messages=messages,
-            )
+            kwargs: dict[str, Any] = {
+                "model": model,
+                "response_format": _response_format(
+                    schema_name, schema, use_schema=use_schema
+                ),
+                "messages": messages,
+            }
+            if not _omit_temperature(model):
+                kwargs["temperature"] = temperature
+            response = _completions_create(client, kwargs)
             choice = response.choices[0]
             content = choice.message.content
             if not content or not str(content).strip():
@@ -142,7 +191,6 @@ def _chat_json(
                 "response_format" in message
                 or "json_schema" in message
                 or "invalid_json_schema" in message
-                or "unsupported" in message
             ):
                 continue
             raise OpenAIRequestError(f"OpenAI request failed: {exc}") from exc

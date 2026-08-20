@@ -96,6 +96,8 @@ def test_serves_index_and_ops_and_vendor(tmp_path: Path, monkeypatch) -> None:
     assert b"Simple" in index.content
     assert b"Common" in index.content
     assert b"Gnarly" in index.content
+    assert b"Bugs get harder as you progress through the round." in index.content
+    assert b"difficulty-ramp-note" in index.content
     assert ops.status_code == 200
     assert b"Bugmiester Ops" in ops.content
     assert css.status_code == 200
