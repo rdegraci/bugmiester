@@ -97,6 +97,23 @@ def test_parse_judge_payload() -> None:
     assert isinstance(judged, JudgeResult)
     assert judged.partial is True
     assert judged.confidence == 0.4
+    assert judged.give_up is False
+
+
+def test_parse_judge_give_up_allows_empty_feedback() -> None:
+    judged = parse_judge_payload(
+        {
+            "correct": True,
+            "partial": True,
+            "give_up": True,
+            "feedback": "",
+            "confidence": 0.9,
+        }
+    )
+    assert judged.give_up is True
+    assert judged.correct is False
+    assert judged.partial is False
+    assert judged.feedback == ""
 
 
 def test_prompts_include_seed_and_avoid_list() -> None:
@@ -120,6 +137,7 @@ def test_prompts_include_seed_and_avoid_list() -> None:
     assert "Force unwrap" in judge_prompt
     assert "force unwrap" in judge_prompt
     assert "confidence" in judge_prompt
+    assert "give_up" in judge_prompt
 
 
 def test_recovery_prompt_asks_for_near_misses() -> None:

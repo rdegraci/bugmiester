@@ -10,7 +10,28 @@ from dataclasses import dataclass, field
 from bugmiester.config import Settings
 from bugmiester.freshness import GeneratedSnippet, HistoryEntry, ScenarioSeed
 from bugmiester.llm.base import JudgeResult
-from bugmiester.scoring import keyword_match_tier
+from bugmiester.scoring import is_give_up_answer, keyword_match_tier
+
+
+def _mock_soft_give_up(answer: str) -> bool:
+    """Extra paraphrases the live judge would catch; exact phrases use is_give_up_answer."""
+    key = re.sub(r"\s+", " ", answer.strip().lower())
+    key = key.replace("'", "").replace("'", "")
+    soft = {
+        "beats me",
+        "no clue",
+        "not sure",
+        "nope no idea",
+        "give up",
+        "i give up",
+        "whatever",
+        "who knows",
+        "im stumped",
+        "i am stumped",
+        "got me",
+        "you got me",
+    }
+    return key in soft
 
 
 @dataclass(frozen=True)
@@ -1629,6 +1650,7 @@ class MockProvider:
             {
                 "correct": judged.correct,
                 "partial": judged.partial,
+                "give_up": judged.give_up,
                 "feedback": judged.feedback,
                 "confidence": judged.confidence,
             }
@@ -1647,6 +1669,15 @@ class MockProvider:
         stay exercisable without a live provider.
         """
         del code  # available for future richer fixtures
+        if is_give_up_answer(player_answer) or _mock_soft_give_up(player_answer):
+            return JudgeResult(
+                correct=False,
+                partial=False,
+                feedback="",
+                confidence=0.95,
+                give_up=True,
+            )
+
         keywords: tuple[str, ...] = ()
         for snip in self._snippets:
             if snip.bug_summary == expected_summary:

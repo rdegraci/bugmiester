@@ -12,10 +12,28 @@ from bugmiester.llm.base import JudgeResult as JudgeResult
 # Confidence at or below this is "low" for generosity.
 LOW_CONFIDENCE_THRESHOLD = 0.5
 
+# Exact give-up keys after normalize (apostrophes/punctuation stripped).
+_GIVE_UP_KEYS = frozenset(
+    {
+        "i dont know",
+        "i do not know",
+        "idk",
+        "no idea",
+        "dunno",
+        "pass",
+        "skip",
+        "n a",
+        "na",
+        "none",
+        "?",
+    }
+)
+
 # Re-export for call sites / tests that import from scoring.
 __all__ = [
     "JudgeResult",
     "ScoreResult",
+    "is_give_up_answer",
     "keyword_match_tier",
     "score_answer",
     "score_keyword",
@@ -42,8 +60,41 @@ def _normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text.strip().lower())
 
 
+def _give_up_key(answer: str) -> str:
+    """Canonical form for give-up matching (exact phrase only)."""
+    raw = answer.strip()
+    if raw == "?":
+        return "?"
+    key = _normalize(answer)
+    for mark in ("'", "'", "'", "`"):
+        key = key.replace(mark, "")
+    key = key.replace("/", " ")
+    key = re.sub(r"[^\w\s]", " ", key)
+    return re.sub(r"\s+", " ", key).strip()
+
+
+def is_give_up_answer(answer: str) -> bool:
+    """True when the player explicitly declines to guess (not empty)."""
+    if not answer or not str(answer).strip():
+        return False
+    return _give_up_key(answer) in _GIVE_UP_KEYS
+
+
+def _give_up_result(expected_summary: str, points_possible: int) -> ScoreResult:
+    return ScoreResult(
+        correct=False,
+        partial=False,
+        points_awarded=0,
+        points_possible=points_possible,
+        feedback="",
+        expected_summary=expected_summary,
+        judge_called=False,
+    )
+
+
 def _tokens(text: str) -> set[str]:
     return {t for t in re.split(r"[^a-z0-9+]+", _normalize(text)) if len(t) > 2}
+
 
 
 def _half_points(points_possible: int) -> int:
@@ -116,6 +167,9 @@ def score_keyword(
     partial_credit: bool = True,
 ) -> ScoreResult:
     """Keyword-only scoring with optional half-credit partials."""
+    if is_give_up_answer(answer):
+        return _give_up_result(expected_summary, points_possible)
+
     tier = keyword_match_tier(
         expected_summary, answer, keywords, bug_category=bug_category
     )
@@ -203,6 +257,16 @@ def _from_judge(
     scoring: ScoringSettings,
     judge_called: bool,
 ) -> ScoreResult:
+    if judge.give_up and not judge.correct:
+        return ScoreResult(
+            correct=False,
+            partial=False,
+            points_awarded=0,
+            points_possible=points_possible,
+            feedback="",
+            expected_summary=expected_summary,
+            judge_called=judge_called,
+        )
     correct, partial, awarded, feedback = _apply_generosity(
         judge,
         expected_summary=expected_summary,
@@ -242,6 +306,9 @@ def score_answer(
     points_possible = scoring.points_per_bug
     mode = (scoring.mode or "hybrid").strip().lower()
     allowed_calls = max(0, max_judge_calls)
+
+    if is_give_up_answer(answer):
+        return _give_up_result(expected_summary, points_possible)
 
     def call_judge() -> ScoreResult:
         if allowed_calls < 1 or judge_fn is None:

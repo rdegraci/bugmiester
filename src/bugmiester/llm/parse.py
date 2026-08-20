@@ -187,7 +187,18 @@ def parse_judge_payload(raw: str | dict[str, Any]) -> JudgeResult:
         raise ParseError("'correct' must be a boolean")
     if not isinstance(partial, bool):
         raise ParseError("'partial' must be a boolean")
-    feedback = _as_nonempty_str(data["feedback"], "feedback")
+
+    give_up_raw = data.get("give_up", False)
+    if not isinstance(give_up_raw, bool):
+        raise ParseError("'give_up' must be a boolean")
+    give_up = bool(give_up_raw)
+
+    if give_up:
+        feedback = str(data.get("feedback") or "").strip()
+        correct = False
+        partial = False
+    else:
+        feedback = _as_nonempty_str(data["feedback"], "feedback")
 
     confidence_raw = data.get("confidence", 1.0)
     try:
@@ -204,6 +215,7 @@ def parse_judge_payload(raw: str | dict[str, Any]) -> JudgeResult:
         partial=partial,
         feedback=feedback,
         confidence=confidence,
+        give_up=give_up,
     )
 
 

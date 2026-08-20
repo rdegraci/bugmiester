@@ -12,6 +12,7 @@ from bugmiester.config import ScoringSettings, ensure_app_dir, load_settings
 from bugmiester.llm.mock_provider import MockProvider, SEED_SNIPPETS
 from bugmiester.scoring import (
     JudgeResult,
+    is_give_up_answer,
     score_answer,
     score_keyword,
 )
@@ -266,3 +267,88 @@ def test_mock_round_sensible_scores_and_expected_summary(
         assert miss["partial"] is False
         assert miss["round_score"] == strong["points_awarded"]
         assert miss["round_possible"] == 100
+
+
+def test_give_up_phrases_recognized() -> None:
+    for phrase in (
+        "I don't know",
+        "i dont know",
+        "IDK",
+        "no idea",
+        "dunno",
+        "pass",
+        "skip",
+        "?",
+        "n/a",
+        "none",
+    ):
+        assert is_give_up_answer(phrase), phrase
+    assert not is_give_up_answer("")
+    assert not is_give_up_answer("   ")
+    assert not is_give_up_answer(
+        "I don't know if it's a force unwrap of the optional"
+    )
+
+
+def test_give_up_reveals_expected_without_not_quite() -> None:
+    result = score_keyword(
+        SUMMARY,
+        "I don't know",
+        KEYWORDS,
+        points_possible=10,
+    )
+    assert result.correct is False
+    assert result.partial is False
+    assert result.points_awarded == 0
+    assert result.feedback == ""
+    assert result.expected_summary == SUMMARY
+    assert result.judge_called is False
+
+
+def test_hybrid_give_up_skips_judge() -> None:
+    calls = {"n": 0}
+
+    def judge(_code: str, _expected: str, _answer: str) -> JudgeResult:
+        calls["n"] += 1
+        return JudgeResult(False, False, "Not quite.", confidence=0.9)
+
+    result = score_answer(
+        code=CODE,
+        expected_summary=SUMMARY,
+        answer="idk",
+        keywords=KEYWORDS,
+        scoring=ScoringSettings(mode="hybrid", points_per_bug=10),
+        max_judge_calls=1,
+        judge_fn=judge,
+    )
+    assert calls["n"] == 0
+    assert result.feedback == ""
+    assert result.expected_summary == SUMMARY
+    assert result.points_awarded == 0
+
+
+def test_hybrid_llm_give_up_paraphrase() -> None:
+    calls = {"n": 0}
+
+    def judge(_code: str, _expected: str, _answer: str) -> JudgeResult:
+        calls["n"] += 1
+        return JudgeResult(
+            False, False, "", confidence=0.9, give_up=True
+        )
+
+    result = score_answer(
+        code=CODE,
+        expected_summary=SUMMARY,
+        answer="beats me",
+        keywords=KEYWORDS,
+        scoring=ScoringSettings(mode="hybrid", points_per_bug=10),
+        max_judge_calls=1,
+        judge_fn=judge,
+    )
+    assert calls["n"] == 1
+    assert result.judge_called is True
+    assert result.feedback == ""
+    assert result.expected_summary == SUMMARY
+    assert result.correct is False
+    assert result.partial is False
+    assert result.points_awarded == 0

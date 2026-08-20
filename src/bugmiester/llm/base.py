@@ -30,6 +30,7 @@ class JudgeResult:
     partial: bool
     feedback: str
     confidence: float = 1.0
+    give_up: bool = False
 
 
 class LlmProvider(Protocol):

@@ -101,8 +101,11 @@ Player answer:
 Return ONLY valid JSON with these keys:
 - "correct": boolean (true only if the player clearly named the intended bug)
 - "partial": boolean (true for incomplete but on-track answers; false if correct)
-- "feedback": string (short verdict only, e.g. "Yes." / "Partially correct." / "Not quite." — do not repeat the expected bug summary)
+- "give_up": boolean (true if the player is declining to guess — e.g. "I don't know", "no clue", "beats me", "pass" — not a real bug hypothesis)
+- "feedback": string (short verdict only, e.g. "Yes." / "Partially correct." / "Not quite." — do not repeat the expected bug summary; use "" when give_up is true)
 - "confidence": number from 0.0 to 1.0
+
+If give_up is true, set correct and partial to false.
 """
 
 

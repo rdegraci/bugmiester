@@ -38,10 +38,11 @@ JUDGE_JSON_SCHEMA: dict[str, Any] = {
     "properties": {
         "correct": {"type": "boolean"},
         "partial": {"type": "boolean"},
+        "give_up": {"type": "boolean"},
         "feedback": {"type": "string"},
         "confidence": {"type": "number"},
     },
-    "required": ["correct", "partial", "feedback", "confidence"],
+    "required": ["correct", "partial", "give_up", "feedback", "confidence"],
     "additionalProperties": False,
 }
 
