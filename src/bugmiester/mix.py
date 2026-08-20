@@ -54,12 +54,13 @@ SLOP_MIX_CATEGORIES = frozenset(
     }
 )
 
-# Held out of the middle of a senior round so slots 9–10 can use them.
+# Held out of the Common middle so slots 9–10 can use them.
+# Ordinary "concurrency" stays in SENIOR_CORE; only allowlisted hard
+# concurrency costumes (see GNARLY_SEED_IDS / is_gnarly_seed) are gnarly.
 GNARLY_CATEGORIES = frozenset(
     {
         "actor reentrancy",
         "exclusivity",
-        "concurrency",
     }
 )
 

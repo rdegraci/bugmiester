@@ -11,7 +11,6 @@ from dataclasses import dataclass
 
 from bugmiester.llm.parse import ParseError
 from bugmiester.mix import (
-    GNARLY_SEED_IDS,
     is_gnarly_seed,
     normalize_mix,
     preferred_categories,
@@ -606,6 +605,10 @@ def pick_seed(
 
     ``mix`` weights which classes come first. Default here is unweighted so unit
     tests stay stable; live rounds pass ``game.mix`` (default ``senior_mix``).
+
+    Within a preferred band (Simple / Common / Gnarly), the next seed is
+    chosen at random among matches so the round stays varied even when pool
+    order is sticky.
     """
     if not pool:
         raise ValueError("SEED_POOL is empty")
@@ -625,27 +628,28 @@ def pick_seed(
     )
 
     def _preferred(candidates: list[ScenarioSeed]) -> list[ScenarioSeed]:
-        matched = [seed for seed in candidates if seed.category in prefer]
         if gnarly_only:
-            matched = [seed for seed in matched if is_gnarly_seed(seed)]
-            matched.sort(
-                key=lambda seed: (
-                    0
-                    if seed.seed_id in GNARLY_SEED_IDS
-                    else 1
-                    if seed.category == "actor reentrancy"
-                    else 2
-                )
-            )
+            # Include allowlisted concurrency costumes (e.g. stuck continuation)
+            # whose category is not in GNARLY_CATEGORIES.
+            return [seed for seed in candidates if is_gnarly_seed(seed)]
+        matched = [seed for seed in candidates if seed.category in prefer]
+        # Reserve reentrancy / exclusivity / allowlisted ids for the end.
+        if normalize_mix(mix) == "senior_mix":
+            matched = [seed for seed in matched if not is_gnarly_seed(seed)]
         return matched
+
+    def _take(matched: list[ScenarioSeed]) -> ScenarioSeed:
+        if len(matched) == 1:
+            return matched[0]
+        return random.choice(matched)
 
     if prefer:
         prefer_under = _preferred(under_cap)
         if prefer_under:
-            return prefer_under[0]
+            return _take(prefer_under)
         prefer_unused = _preferred(unused)
         if prefer_unused:
-            return prefer_unused[0]
+            return _take(prefer_unused)
     if under_cap:
         return under_cap[0]
     if unused:

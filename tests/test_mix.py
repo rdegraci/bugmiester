@@ -42,8 +42,7 @@ def test_senior_mix_ramps_slop_then_senior_then_gnarly() -> None:
         seed.category in SENIOR_CORE_CATEGORIES for seed in seeds[quota:-2]
     )
     assert all(is_gnarly_seed(seed) for seed in seeds[-2:])
-    assert seeds[-2].seed_id == "conc-continuation-stuck"
-    assert seeds[-1].seed_id == "actor-await-stale"
+    assert len({seed.seed_id for seed in seeds[-2:]}) == 2
     assert len({seed.category for seed in seeds}) == 10
     assert [difficulty_label("senior_mix", i, 10) for i in range(10)] == [
         "Simple",
@@ -86,3 +85,63 @@ def test_intermediate_mix_is_unweighted() -> None:
     assert seed.seed_id == SEED_POOL[0].seed_id
     assert difficulty_label("intermediate_mix", 0, 10) == ""
     assert difficulty_label("beginner_mix", 8, 10) == ""
+
+
+def test_senior_mix_simple_band_varies_across_rounds() -> None:
+    """Simple openers pick randomly among slop seeds, not always pool[0]."""
+    first_ids: set[str] = set()
+    for _ in range(40):
+        seed = pick_seed(
+            SEED_POOL,
+            set(),
+            mix="senior_mix",
+            bugs_per_round=10,
+        )
+        assert seed.category in SLOP_MIX_CATEGORIES
+        first_ids.add(seed.seed_id)
+    assert len(first_ids) >= 3
+
+
+def test_senior_mix_gnarly_band_varies_across_rounds() -> None:
+    """End-of-round gnarly picks randomly among gnarly seeds."""
+    last_ids: set[str] = set()
+    for _ in range(40):
+        used: set[str] = set()
+        # Burn Simple + Common slots so the next pick is gnarly.
+        for _slot in range(8):
+            seed = pick_seed(
+                SEED_POOL,
+                used,
+                mix="senior_mix",
+                bugs_per_round=10,
+            )
+            used.add(seed.seed_id)
+        gnarly = pick_seed(
+            SEED_POOL,
+            used,
+            mix="senior_mix",
+            bugs_per_round=10,
+        )
+        assert is_gnarly_seed(gnarly)
+        last_ids.add(gnarly.seed_id)
+    assert len(last_ids) >= 2
+
+
+def test_senior_mix_ordinary_concurrency_in_common_not_gnarly_only() -> None:
+    """Missing-await etc. can appear in Common; stuck continuation stays gnarly."""
+    assert "concurrency" in SENIOR_CORE_CATEGORIES
+    common_conc: set[str] = set()
+    for _ in range(80):
+        used: set[str] = set()
+        for _slot in range(2):  # burn Simple
+            used.add(
+                pick_seed(
+                    SEED_POOL, used, mix="senior_mix", bugs_per_round=10
+                ).seed_id
+            )
+        seed = pick_seed(SEED_POOL, used, mix="senior_mix", bugs_per_round=10)
+        assert not is_gnarly_seed(seed)
+        if seed.category == "concurrency":
+            common_conc.add(seed.seed_id)
+    assert common_conc
+    assert "conc-continuation-stuck" not in common_conc
