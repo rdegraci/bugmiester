@@ -332,6 +332,23 @@ func spin(_ id: Int) async {}
         hints=("withTaskGroup so the parent waits",),
         keywords=("Task.detached", "loop", "TaskGroup", "unstructured"),
     ),
+    "conc-taskgroup-early": MockSnippet(
+        code="""\
+func firstWins(_ ids: [Int]) async -> Int {
+    await withTaskGroup(of: Int.self) { group in
+        for id in ids {
+            group.addTask { id * id }
+        }
+        return await group.next() ?? 0
+    }
+}
+""",
+        bug_summary="Returning the first group.next() cancels every other child before it finishes",
+        bug_category="concurrency",
+        difficulty="advanced",
+        hints=("Collect all results, then return",),
+        keywords=("TaskGroup", "next", "cancel", "first"),
+    ),
     "conc-async-let": MockSnippet(
         code="""\
 func total() async -> Int {
@@ -602,6 +619,25 @@ func enter() async {
         difficulty="intermediate",
         hints=("Token is not Sendable",),
         keywords=("Sendable", "actor", "Token", "isolation"),
+    ),
+    "send-actor-task-race": MockSnippet(
+        code="""\
+final class Bag {
+    var items: [String] = []
+}
+actor Shelf {
+    let bag = Bag()
+    func stock(_ item: String) {
+        Task { self.bag.items.append(item) }
+        bag.items.append(item)
+    }
+}
+""",
+        bug_summary="Shelf and the Task it starts both append to the same non-Sendable Bag",
+        bug_category="sendable",
+        difficulty="advanced",
+        hints=("Keep Bag mutations on one isolation domain",),
+        keywords=("Sendable", "actor", "Task", "Bag"),
     ),
     "cod-key-mismatch": MockSnippet(
         code="""\

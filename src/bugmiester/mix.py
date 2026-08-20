@@ -68,7 +68,9 @@ GNARLY_SEED_IDS = frozenset(
     {
         "conc-continuation-stuck",
         "conc-continuation-double",
+        "conc-taskgroup-early",
         "main-await-hop",
+        "send-actor-task-race",
     }
 )
 

@@ -109,6 +109,12 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
         "must spawn Task in a loop instead of withTaskGroup; not a single orphaned Task; not missing await on one call",
     ),
     ScenarioSeed(
+        "conc-taskgroup-early",
+        "concurrency",
+        "TaskGroup returns after the first child and cancels the rest",
+        "must use withTaskGroup and return after group.next() (or equivalent) so remaining children are cancelled; not unstructured Task in a loop; not missing await on one call",
+    ),
+    ScenarioSeed(
         "conc-async-let",
         "concurrency",
         "async let results used without await",
@@ -163,6 +169,12 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
         "sendable",
         "non-Sendable class passed into actor",
         "must be a compile-logic isolation error",
+    ),
+    ScenarioSeed(
+        "send-actor-task-race",
+        "sendable",
+        "actor and Task both mutate the same non-Sendable class",
+        "must mutate one non-Sendable instance from an actor method and from a Task it starts; not only passing the class into an actor; not Task-only mutation without an actor",
     ),
     ScenarioSeed(
         "cod-key-mismatch",

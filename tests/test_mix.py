@@ -146,10 +146,14 @@ def test_senior_mix_ordinary_concurrency_in_common_not_gnarly_only() -> None:
     assert common_conc
     assert "conc-continuation-stuck" not in common_conc
     assert "conc-continuation-double" not in common_conc
+    assert "conc-taskgroup-early" not in common_conc
 
 
 def test_new_gnarly_allowlist_seeds_are_is_gnarly() -> None:
     by_id = {seed.seed_id: seed for seed in SEED_POOL}
     assert is_gnarly_seed(by_id["conc-continuation-double"])
+    assert is_gnarly_seed(by_id["conc-taskgroup-early"])
     assert is_gnarly_seed(by_id["main-await-hop"])
+    assert is_gnarly_seed(by_id["send-actor-task-race"])
     assert by_id["main-await-hop"].category == "MainActor"
+    assert by_id["send-actor-task-race"].category == "sendable"

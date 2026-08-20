@@ -387,6 +387,27 @@ func load(_ url: URL) async {}
         hints=("Use withTaskGroup or async let",),
         keywords=("Task", "loop", "TaskGroup", "unstructured"),
     ),
+    "conc-taskgroup-early": MockSnippet(
+        code="""\
+func titles(_ urls: [URL]) async -> [String] {
+    await withTaskGroup(of: String.self) { group in
+        for url in urls {
+            group.addTask { await title(for: url) }
+        }
+        if let first = await group.next() {
+            return [first]
+        }
+        return []
+    }
+}
+func title(for url: URL) async -> String { url.absoluteString }
+""",
+        bug_summary="Returning after the first group.next() cancels the remaining child tasks, so titles is incomplete",
+        bug_category="concurrency",
+        difficulty="advanced",
+        hints=("Drain the whole group before returning",),
+        keywords=("TaskGroup", "next", "cancel", "early"),
+    ),
     "conc-async-let": MockSnippet(
         code="""\
 func pair() async -> (String, String) {
@@ -667,6 +688,24 @@ func park(_ shelf: Shelf, _ bag: Bag) async {
         difficulty="intermediate",
         hints=("Bag crosses isolation",),
         keywords=("Sendable", "actor", "isolation", "class"),
+    ),
+    "send-actor-task-race": MockSnippet(
+        code="""\
+final class Counter {
+    var n = 0
+}
+actor Hub {
+    func bump(_ counter: Counter) {
+        Task { counter.n += 1 }
+        counter.n += 1
+    }
+}
+""",
+        bug_summary="The actor and the Task it starts both mutate the same non-Sendable Counter",
+        bug_category="sendable",
+        difficulty="advanced",
+        hints=("Don't share a non-Sendable class across Task and actor",),
+        keywords=("Sendable", "actor", "Task", "race"),
     ),
     "cod-key-mismatch": MockSnippet(
         code="""\
