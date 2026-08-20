@@ -27,7 +27,7 @@ class ScenarioSeed:
         return base
 
 
-# Curated pool — 31 categories so a 10-bug round can skip class repeats
+# Curated pool — 32 categories so a 10-bug round can skip class repeats
 # and later rounds still have unused classes.
 SEED_POOL: tuple[ScenarioSeed, ...] = (
     ScenarioSeed("opt-dict-force", "optionals", "dictionary lookup"),
@@ -385,6 +385,24 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
         "Combine",
         "subscription stored on a longer-lived bag",
         "must keep a publisher subscribed after the screen is gone; not a local Set; not a dropped sink; not receive(on:)",
+    ),
+    ScenarioSeed(
+        "excl-inout-same",
+        "exclusivity",
+        "two inout arguments alias the same memory",
+        "must overlap inout accesses; not a missed inout; not mutating a let",
+    ),
+    ScenarioSeed(
+        "excl-self-inout",
+        "exclusivity",
+        "mutating method takes inout self",
+        "must pass &self into a mutating method; not a retain cycle; not mutating a let",
+    ),
+    ScenarioSeed(
+        "excl-prop-inout",
+        "exclusivity",
+        "inout to a property that the method also accesses",
+        "must pass &property into a mutating method that also reads or writes that stored property",
     ),
 )
 

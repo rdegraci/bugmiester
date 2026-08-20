@@ -1188,6 +1188,63 @@ final class Roster: ObservableObject {
         hints=("Keep the cancellable on Roster",),
         keywords=("AnyCancellable", "shared", "delay", "lifetime"),
     ),
+    "excl-inout-same": MockSnippet(
+        code="""\
+func swap(_ a: inout Int, _ b: inout Int) {
+    let t = a
+    a = b
+    b = t
+}
+func flip(_ n: inout Int) {
+    swap(&n, &n)
+}
+""",
+        bug_summary="swap(&n, &n) gives two overlapping inout accesses to the same Int",
+        bug_category="exclusivity",
+        difficulty="intermediate",
+        hints=("The two & arguments must be distinct memory",),
+        keywords=("inout", "swap", "overlap", "exclusivity"),
+    ),
+    "excl-self-inout": MockSnippet(
+        code="""\
+struct Box {
+    var n = 0
+    mutating func merge(_ other: inout Box) {
+        n += other.n
+    }
+}
+func clash() {
+    var box = Box()
+    box.merge(&box)
+}
+""",
+        bug_summary="merge takes inout Box that is the same instance as self",
+        bug_category="exclusivity",
+        difficulty="intermediate",
+        hints=("Use a second Box",),
+        keywords=("inout", "self", "merge", "exclusivity"),
+    ),
+    "excl-prop-inout": MockSnippet(
+        code="""\
+struct Stats {
+    var hits = 0
+    var total = 0
+    mutating func copyHits(_ dest: inout Int) {
+        dest = hits
+        hits = 0
+    }
+}
+func clash() {
+    var stats = Stats()
+    stats.copyHits(&stats.hits)
+}
+""",
+        bug_summary="copyHits writes hits while dest is an inout alias of hits",
+        bug_category="exclusivity",
+        difficulty="intermediate",
+        hints=("Pass a different Int, not &stats.hits",),
+        keywords=("inout", "property", "hits", "exclusivity"),
+    ),
 }
 
 _DEFAULT_FALLBACK = MockSnippet(

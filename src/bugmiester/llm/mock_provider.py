@@ -1259,6 +1259,61 @@ final class Screen: UIViewController {
         hints=("Store cancellables on Screen and cancel on deinit",),
         keywords=("AnyCancellable", "static", "Timer", "cancel"),
     ),
+    "excl-inout-same": MockSnippet(
+        code="""\
+func add(_ a: inout Int, _ b: inout Int) {
+    a += b
+}
+func bump(_ n: inout Int) {
+    add(&n, &n)
+}
+""",
+        bug_summary="add is called with &n twice, so the two inout parameters overlap",
+        bug_category="exclusivity",
+        difficulty="intermediate",
+        hints=("Use a copy for the second argument",),
+        keywords=("inout", "overlap", "exclusivity", "alias"),
+    ),
+    "excl-self-inout": MockSnippet(
+        code="""\
+struct Player {
+    var score = 0
+    mutating func absorb(_ other: inout Player) {
+        score += other.score
+    }
+}
+func clash() {
+    var p = Player()
+    p.absorb(&p)
+}
+""",
+        bug_summary="absorb mutates p while also taking &p, which is overlapping access to self",
+        bug_category="exclusivity",
+        difficulty="intermediate",
+        hints=("Pass a different Player, not &p",),
+        keywords=("inout", "self", "exclusivity", "mutating"),
+    ),
+    "excl-prop-inout": MockSnippet(
+        code="""\
+struct Pair {
+    var first = 0
+    var second = 0
+    mutating func reset(_ value: inout Int) {
+        value = first
+        first = second
+    }
+}
+func clash() {
+    var p = Pair()
+    p.reset(&p.first)
+}
+""",
+        bug_summary="reset takes &p.first while the method also reads and writes first",
+        bug_category="exclusivity",
+        difficulty="intermediate",
+        hints=("Do not pass a stored property the method also uses",),
+        keywords=("inout", "property", "exclusivity", "first"),
+    ),
 }
 
 
