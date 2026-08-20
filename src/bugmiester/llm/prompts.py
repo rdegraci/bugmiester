@@ -60,7 +60,8 @@ Rules:
 - Vary control-flow shape when the constraint still holds (different branching, callback style, or call sites) so the snippet does not look like a near-clone of a common sample.
 - Stealth (required): the snippet must look like ordinary production {language} if the bug were fixed. Do not telegraph the defect.
 - No puzzle tells: no suspicious names (e.g. unsafe, force, bug, broken, wrong), no dead decoy lines, no "look here" structure, no contrived one-liner that exists only to showcase the bug.
-- Bury the defect in a short stretch of normal surrounding logic (a few innocent lines or a realistic call path) while staying one screen. Prefer bugs that require reading how pieces interact, not spotting one glaring token in isolation — still honor the seed constraint.
+- Correctness path (required): the buggy site must look correct under a common / plausible reading of the code (for example "this await is fine if you assume MainActor", "this capture looks intentional", "this unwrap is safe after the earlier check"). The challenge should come from a wrong mental model, not from an obviously broken token.
+- Cross-site bug (required): the defect must only become clear when the reader follows how pieces interact across call sites or scopes (A → B → C: e.g. setup, call, and use; or definition and two call sites). Do not put a self-contained one-line giveaway that needs no surrounding context — still honor the seed constraint and stay one screen.
 - Red herring (encouraged): include at most ONE nearby lookalike that appears suspicious but is actually correct / safe / intentional in context (for example a force-unwrap after a guaranteed non-nil check, or a correct await). It must not be a second real defect.
 - Still exactly ONE real bug. "bug_summary" and "keywords" must describe only that real bug — never the red herring.
 - Length: prefer about 30–45 lines of {language}. Aim under 45 lines; never exceed 60 lines.

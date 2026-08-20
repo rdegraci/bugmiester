@@ -158,6 +158,10 @@ def test_prompts_include_seed_and_avoid_list() -> None:
     assert "Keep the same bug class; change the costume" in prompt
     assert "Stealth (required)" in prompt
     assert "No puzzle tells" in prompt
+    assert "Correctness path (required)" in prompt
+    assert "Cross-site bug (required)" in prompt
+    assert "wrong mental model" in prompt
+    assert "A → B → C" in prompt or "A -> B -> C" in prompt
     assert "Red herring" in prompt
     assert "never exceed 60 lines" in prompt
     assert "30–45 lines" in prompt or "30-45 lines" in prompt
