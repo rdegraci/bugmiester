@@ -115,6 +115,8 @@ def generate_bug(
     used_seed_ids: set[str],
     history: Sequence[HistoryEntry],
     seed_pool: Sequence[ScenarioSeed] = SEED_POOL,
+    mix: str | None = None,
+    bugs_per_round: int | None = None,
 ) -> GenerateBugResult:
     """
     Generate one validated snippet.
@@ -151,6 +153,12 @@ def generate_bug(
         avoid_list_max=settings.freshness.avoid_list_max,
         use_fallback=settings.resilience.use_canned_fallback_on_generate_exhaustion,
         max_category_repeats=settings.freshness.max_category_repeats_per_round,
+        mix=mix if mix is not None else settings.game.mix,
+        bugs_per_round=(
+            bugs_per_round
+            if bugs_per_round is not None
+            else settings.game.bugs_per_round
+        ),
         generate_raw_fn=generate_raw_fn,
         parse_raw=parse_raw,
         fallback_fn=fallback_for_seed,

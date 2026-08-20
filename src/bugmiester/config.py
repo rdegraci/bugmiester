@@ -11,6 +11,8 @@ from typing import Any, Mapping
 import yaml
 from dotenv import dotenv_values, load_dotenv
 
+from bugmiester.mix import DEFAULT_MIX, normalize_mix
+
 PLACEHOLDER_KEY = "replace-me"
 
 PROVIDER_ENV_KEYS: dict[str, str | None] = {
@@ -47,6 +49,7 @@ class LlmSettings:
 class GameSettings:
     bugs_per_round: int = 10
     language: str = "swift"
+    mix: str = "senior_mix"
 
 
 @dataclass(frozen=True)
@@ -186,6 +189,7 @@ def _parse_yaml_config(raw: Mapping[str, Any]) -> dict[str, Any]:
         "game": GameSettings(
             bugs_per_round=int(game_raw.get("bugs_per_round", 10)),
             language=str(game_raw.get("language", "swift")),
+            mix=normalize_mix(game_raw.get("mix", DEFAULT_MIX)),
         ),
         "scoring": ScoringSettings(
             mode=str(scoring_raw.get("mode", "hybrid")),

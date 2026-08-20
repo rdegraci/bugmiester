@@ -10,6 +10,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from bugmiester.llm.parse import ParseError
+from bugmiester.mix import preferred_categories
 
 
 @dataclass(frozen=True)
@@ -588,12 +589,17 @@ def pick_seed(
     used_seed_ids: set[str],
     *,
     max_category_repeats: int = 1,
+    mix: str = "intermediate_mix",
+    bugs_per_round: int = 10,
 ) -> ScenarioSeed:
     """
     Next unused seed, preferring categories still under the per-round cap.
 
     After every category has been used ``max_category_repeats`` times, unused
     seeds in already-seen categories are allowed so a 10-bug round can finish.
+
+    ``mix`` weights which classes come first. Default here is unweighted so unit
+    tests stay stable; live rounds pass ``game.mix`` (default ``senior_mix``).
     """
     if not pool:
         raise ValueError("SEED_POOL is empty")
@@ -604,6 +610,16 @@ def pick_seed(
     under_cap = [
         seed for seed in unused if category_counts[seed.category] < cap
     ]
+    prefer = preferred_categories(
+        mix, used_seeds, bugs_per_round=bugs_per_round
+    )
+    if prefer:
+        prefer_under = [seed for seed in under_cap if seed.category in prefer]
+        if prefer_under:
+            return prefer_under[0]
+        prefer_unused = [seed for seed in unused if seed.category in prefer]
+        if prefer_unused:
+            return prefer_unused[0]
     if under_cap:
         return under_cap[0]
     if unused:
@@ -626,6 +642,8 @@ def generate_with_freshness(
     avoid_list_max: int = 20,
     use_fallback: bool = True,
     max_category_repeats: int = 1,
+    mix: str = "intermediate_mix",
+    bugs_per_round: int = 10,
     generate_fn: GenerateFn | None = None,
     generate_raw_fn: RawGenerateFn | None = None,
     fallback_fn: FallbackFn,
@@ -649,6 +667,8 @@ def generate_with_freshness(
         seed_pool,
         used_seed_ids,
         max_category_repeats=max_category_repeats,
+        mix=mix,
+        bugs_per_round=bugs_per_round,
     )
     used_seed_ids.add(seed.seed_id)
     avoid = build_avoid_list(history, max_items=avoid_list_max)

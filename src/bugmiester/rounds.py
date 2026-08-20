@@ -146,6 +146,7 @@ class RoundState:
     snippets: dict[str, StoredSnippet] = field(default_factory=dict)
     used_seed_ids: set[str] = field(default_factory=set)
     seed_pool: tuple[ScenarioSeed, ...] = field(default_factory=tuple)
+    seed_mix: str = "senior_mix"
     complete: bool = False
 
 
@@ -174,6 +175,7 @@ class RoundStore:
                 shuffle=settings.freshness.shuffle_seeds,
                 recent_seed_ids=recent_ids,
             ),
+            seed_mix=settings.game.mix,
         )
         self._rounds[round_id] = state
         if settings.metrics.log_per_bug:
@@ -216,6 +218,8 @@ class RoundStore:
                 used_seed_ids=state.used_seed_ids,
                 history=list(self._history),
                 seed_pool=state.seed_pool or SEED_POOL,
+                mix=state.seed_mix,
+                bugs_per_round=state.bugs_per_round,
             )
         except Exception as exc:
             mapped = _map_provider_error(exc)

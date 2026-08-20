@@ -13,6 +13,9 @@ llm:
 game:
   bugs_per_round: 10
   language: swift
+  # beginner_mix | intermediate_mix | senior_mix
+  # senior_mix weights isolation/SwiftUI/Combine and keeps 1–2 slop bugs
+  mix: senior_mix
 
 scoring:
   mode: hybrid              # keyword | llm_judge | hybrid (MVP default: hybrid)
