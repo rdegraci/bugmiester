@@ -59,6 +59,27 @@ body {
   font-family: inherit;
 }
 
+.tok-keyword {
+  color: #7eb6ff;
+}
+
+.tok-string {
+  color: #9ad47b;
+}
+
+.tok-number {
+  color: #d4a5ff;
+}
+
+.tok-attr {
+  color: #f0a202;
+}
+
+.tok-comment {
+  color: var(--bm-muted);
+  font-style: italic;
+}
+
 .form-control,
 .form-control:focus {
   background-color: var(--bm-panel);

@@ -106,6 +106,11 @@ def test_serves_index_and_ops_and_vendor(tmp_path: Path, monkeypatch) -> None:
     assert "showSetupFromHealth" in js.text
     assert "app_dir" in js.text
     assert "missing_key" in js.text
+    assert "tokenizeSwift" in js.text
+    assert 'span.className = "tok-"' in js.text or "tok-" in js.text
+    styles = client.get("/styles.css")
+    assert styles.status_code == 200
+    assert b"tok-keyword" in styles.content
 
 
 def test_health_payload_shape() -> None:

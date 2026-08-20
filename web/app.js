@@ -68,9 +68,196 @@
     el.classList.toggle("d-none", hidden);
   }
 
+  // Lightweight Swift highlighter (no third-party). Builds DOM nodes only —
+  // never assigns model/API code via innerHTML.
+  const SWIFT_KEYWORDS = new Set([
+    "associatedtype",
+    "class",
+    "deinit",
+    "enum",
+    "extension",
+    "fileprivate",
+    "func",
+    "import",
+    "init",
+    "inout",
+    "internal",
+    "let",
+    "open",
+    "operator",
+    "private",
+    "protocol",
+    "public",
+    "rethrows",
+    "static",
+    "struct",
+    "subscript",
+    "typealias",
+    "var",
+    "break",
+    "case",
+    "catch",
+    "continue",
+    "default",
+    "defer",
+    "do",
+    "else",
+    "fallthrough",
+    "for",
+    "guard",
+    "if",
+    "in",
+    "repeat",
+    "return",
+    "switch",
+    "throw",
+    "throws",
+    "where",
+    "while",
+    "as",
+    "Any",
+    "false",
+    "is",
+    "nil",
+    "self",
+    "Self",
+    "super",
+    "true",
+    "try",
+    "await",
+    "async",
+    "actor",
+    "isolated",
+    "nonisolated",
+    "some",
+    "any",
+    "borrowing",
+    "consuming",
+    "package",
+    "macro",
+    "each",
+    "repeat",
+  ]);
+
+  function tokenizeSwift(source) {
+    const text = String(source == null ? "" : source);
+    const out = [];
+    let i = 0;
+    const n = text.length;
+
+    function push(type, value) {
+      if (!value) return;
+      const last = out[out.length - 1];
+      if (last && last.type === type) {
+        last.value += value;
+      } else {
+        out.push({ type: type, value: value });
+      }
+    }
+
+    function startsWith(s) {
+      return text.startsWith(s, i);
+    }
+
+    while (i < n) {
+      const ch = text[i];
+      const next = i + 1 < n ? text[i + 1] : "";
+
+      if (ch === "/" && next === "/") {
+        const start = i;
+        i += 2;
+        while (i < n && text[i] !== "\n") i += 1;
+        push("comment", text.slice(start, i));
+        continue;
+      }
+      if (ch === "/" && next === "*") {
+        const start = i;
+        i += 2;
+        while (i < n && !(text[i] === "*" && i + 1 < n && text[i + 1] === "/")) {
+          i += 1;
+        }
+        if (i < n) i += 2;
+        push("comment", text.slice(start, i));
+        continue;
+      }
+
+      if (ch === '"') {
+        const start = i;
+        i += 1;
+        // Multiline """ … """
+        if (startsWith('""')) {
+          i += 2;
+          while (i < n && !startsWith('"""')) {
+            if (text[i] === "\\" && i + 1 < n) i += 2;
+            else i += 1;
+          }
+          if (startsWith('"""')) i += 3;
+          push("string", text.slice(start, i));
+          continue;
+        }
+        while (i < n && text[i] !== '"' && text[i] !== "\n") {
+          if (text[i] === "\\" && i + 1 < n) i += 2;
+          else i += 1;
+        }
+        if (i < n && text[i] === '"') i += 1;
+        push("string", text.slice(start, i));
+        continue;
+      }
+
+      if (ch === "@" || ch === "#") {
+        const start = i;
+        i += 1;
+        while (i < n && /[A-Za-z0-9_]/.test(text[i])) i += 1;
+        push("attr", text.slice(start, i));
+        continue;
+      }
+
+      if (/[0-9]/.test(ch) || (ch === "." && /[0-9]/.test(next))) {
+        const start = i;
+        i += 1;
+        while (i < n && /[0-9a-fA-FxX._]/.test(text[i])) i += 1;
+        push("number", text.slice(start, i));
+        continue;
+      }
+
+      if (/[A-Za-z_]/.test(ch)) {
+        const start = i;
+        i += 1;
+        while (i < n && /[A-Za-z0-9_]/.test(text[i])) i += 1;
+        const word = text.slice(start, i);
+        if (SWIFT_KEYWORDS.has(word)) push("keyword", word);
+        else push("plain", word);
+        continue;
+      }
+
+      push("plain", ch);
+      i += 1;
+    }
+    return out;
+  }
+
   function setCode(text) {
     // Model / API code must never use innerHTML.
-    els.codeContent.textContent = text;
+    const root = els.codeContent;
+    if (!root) return;
+    root.replaceChildren();
+    const source = text == null ? "" : String(text);
+    if (!source) {
+      root.appendChild(document.createTextNode(""));
+      return;
+    }
+    const tokens = tokenizeSwift(source);
+    for (let t = 0; t < tokens.length; t += 1) {
+      const tok = tokens[t];
+      if (tok.type === "plain") {
+        root.appendChild(document.createTextNode(tok.value));
+      } else {
+        const span = document.createElement("span");
+        span.className = "tok-" + tok.type;
+        span.textContent = tok.value;
+        root.appendChild(span);
+      }
+    }
   }
 
   function setProgress(message, spinning) {
