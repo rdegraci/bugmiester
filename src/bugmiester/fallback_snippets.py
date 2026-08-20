@@ -110,6 +110,34 @@ func readText(url: URL) -> String {
         hints=("try? yields nil on failure",),
         keywords=("try?", "force unwrap", "nil", "error"),
     ),
+    "err-empty-catch": MockSnippet(
+        code="""\
+func load(_ url: URL) -> Data {
+    do {
+        return try Data(contentsOf: url)
+    } catch {
+    }
+    return Data()
+}
+""",
+        bug_summary="Empty catch hides the read failure and returns empty Data",
+        bug_category="errors",
+        difficulty="beginner",
+        hints=("Log or throw from catch",),
+        keywords=("catch", "empty", "swallow", "Data"),
+    ),
+    "err-try-bang": MockSnippet(
+        code="""\
+func decode(_ data: Data) -> Any {
+    return try! JSONSerialization.jsonObject(with: data)
+}
+""",
+        bug_summary="try! crashes if the JSON is invalid",
+        bug_category="errors",
+        difficulty="beginner",
+        hints=("Use try without the bang",),
+        keywords=("try!", "JSON", "crash", "force"),
+    ),
     "conc-actor-mut": MockSnippet(
         code="""\
 actor Counter {
@@ -163,6 +191,38 @@ func join(_ a: String?, _ b: String) -> String {
         difficulty="beginner",
         hints=("Unwrap in both branches, or return a default",),
         keywords=("if let", "else", "optional", "String"),
+    ),
+    "opt-chain-skip": MockSnippet(
+        code="""\
+final class Session {
+    func logout() { print("bye") }
+}
+func leave(_ session: Session?) {
+    session?.logout()
+    print("left")
+}
+""",
+        bug_summary="session?.logout() is skipped when session is nil, but leave still prints left",
+        bug_category="optionals",
+        difficulty="beginner",
+        hints=("Chaining does not mean the call ran",),
+        keywords=("optional chaining", "?.", "logout", "nil"),
+    ),
+    "opt-iuo-outlet": MockSnippet(
+        code="""\
+import UIKit
+final class Screen: UIViewController {
+    var banner: UIImageView!
+    func show() {
+        banner.isHidden = false
+    }
+}
+""",
+        bug_summary="banner is an implicitly unwrapped UIImageView that is never assigned; show() crashes",
+        bug_category="optionals",
+        difficulty="beginner",
+        hints=("IUO is still optional underneath",),
+        keywords=("IUO", "UIImageView", "!", "crash"),
     ),
     "conc-await-miss": MockSnippet(
         code="""\
@@ -1012,6 +1072,21 @@ final class Roster: ObservableObject {
         difficulty="intermediate",
         hints=("Publish on the main queue",),
         keywords=("MainActor", "@Published", "background", "DispatchQueue"),
+    ),
+    "main-gcd-async": MockSnippet(
+        code="""\
+import UIKit
+func round(_ view: UIView) {
+    DispatchQueue.global().async {
+        view.layer.cornerRadius = 8
+    }
+}
+""",
+        bug_summary="UIView.layer is mutated on a background DispatchQueue",
+        bug_category="MainActor",
+        difficulty="intermediate",
+        hints=("Hop to the main queue before touching layer",),
+        keywords=("DispatchQueue", "global", "layer", "UIView"),
     ),
     "cancel-ignore-flag": MockSnippet(
         code="""\

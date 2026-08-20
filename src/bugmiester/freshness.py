@@ -38,6 +38,18 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
     ScenarioSeed("col-off-by-one", "collections", "table selection index"),
     ScenarioSeed("opt-greet-print", "optionals", "login form greeting"),
     ScenarioSeed("err-try-optional", "errors", "file URL write"),
+    ScenarioSeed(
+        "err-empty-catch",
+        "errors",
+        "empty catch swallows the error",
+        "must have catch with an empty body; not try?; not Result.get",
+    ),
+    ScenarioSeed(
+        "err-try-bang",
+        "errors",
+        "try! on a throwing call",
+        "must use try!; not try?; not a failable init !",
+    ),
     ScenarioSeed("conc-actor-mut", "concurrency", "timer callback bump", "must involve actor"),
     ScenarioSeed("val-let-struct", "value vs reference", "immutable point"),
     ScenarioSeed("opt-array-first", "optionals", "first element access"),
@@ -46,6 +58,18 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
         "optionals",
         "if let then uses the outer optional",
         "must bind with if let or guard let then still use the wrapped optional; no force unwrap",
+    ),
+    ScenarioSeed(
+        "opt-chain-skip",
+        "optionals",
+        "optional chaining skips a side effect",
+        "must use ?. so a mutating or saving call is skipped when nil; no force unwrap; not if let outer",
+    ),
+    ScenarioSeed(
+        "opt-iuo-outlet",
+        "optionals",
+        "implicitly unwrapped IBOutlet",
+        "must use an IUO outlet or UILabel!; not a dictionary !; not as!",
     ),
     ScenarioSeed("conc-await-miss", "concurrency", "missing await on async call"),
     ScenarioSeed(
@@ -325,6 +349,12 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
         "MainActor",
         "ViewModel publishes from an unstructured Task",
         "must update @Published off the main actor from Task; not URLSession dataTask; not missing await; not Combine",
+    ),
+    ScenarioSeed(
+        "main-gcd-async",
+        "MainActor",
+        "UIKit updated from a global DispatchQueue",
+        "must use DispatchQueue.global to touch UI; not Task; not URLSession dataTask; not @Published",
     ),
     ScenarioSeed(
         "cancel-ignore-flag",

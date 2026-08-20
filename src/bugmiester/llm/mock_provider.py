@@ -193,6 +193,34 @@ SEED_SNIPPETS: dict[str, MockSnippet] = {
     "col-off-by-one": MOCK_SNIPPETS[5],
     "opt-greet-print": MOCK_SNIPPETS[6],
     "err-try-optional": MOCK_SNIPPETS[7],
+    "err-empty-catch": MockSnippet(
+        code="""\
+func load(_ url: URL) -> String {
+    do {
+        return try String(contentsOf: url)
+    } catch {
+    }
+    return ""
+}
+""",
+        bug_summary="Empty catch swallows the read error and returns an empty string",
+        bug_category="errors",
+        difficulty="beginner",
+        hints=("Handle or rethrow the error",),
+        keywords=("catch", "empty", "swallow", "error"),
+    ),
+    "err-try-bang": MockSnippet(
+        code="""\
+func load(_ url: URL) -> String {
+    return try! String(contentsOf: url)
+}
+""",
+        bug_summary="try! crashes if the file cannot be read",
+        bug_category="errors",
+        difficulty="beginner",
+        hints=("try! is a force try",),
+        keywords=("try!", "crash", "throws", "force"),
+    ),
     "conc-actor-mut": MOCK_SNIPPETS[8],
     "val-let-struct": MOCK_SNIPPETS[9],
     "opt-array-first": MockSnippet(
@@ -221,6 +249,38 @@ func display(_ name: String?) -> String {
         difficulty="beginner",
         hints=("The unwrap does not last past the if",),
         keywords=("if let", "optional", "outer", "unwrap"),
+    ),
+    "opt-chain-skip": MockSnippet(
+        code="""\
+final class Disk {
+    func save() { print("saved") }
+}
+func persist(_ disk: Disk?) {
+    disk?.save()
+    print("done")
+}
+""",
+        bug_summary="disk?.save() does nothing when disk is nil, but persist still prints done",
+        bug_category="optionals",
+        difficulty="beginner",
+        hints=("?. skips the call when nil",),
+        keywords=("optional chaining", "?.", "nil", "skipped"),
+    ),
+    "opt-iuo-outlet": MockSnippet(
+        code="""\
+import UIKit
+final class Screen: UIViewController {
+    @IBOutlet var titleLabel: UILabel!
+    func paint() {
+        titleLabel.text = "Hi"
+    }
+}
+""",
+        bug_summary="titleLabel is an implicitly unwrapped outlet; paint() crashes if the outlet is nil",
+        bug_category="optionals",
+        difficulty="beginner",
+        hints=("IBOutlet was not connected",),
+        keywords=("IBOutlet", "IUO", "!", "nil"),
     ),
     "conc-await-miss": MockSnippet(
         code="""\
@@ -1067,6 +1127,21 @@ final class Board: ObservableObject {
         difficulty="intermediate",
         hints=("Hop to the main actor before publishing",),
         keywords=("MainActor", "@Published", "Task", "ObservableObject"),
+    ),
+    "main-gcd-async": MockSnippet(
+        code="""\
+import UIKit
+func paint(_ label: UILabel, _ text: String) {
+    DispatchQueue.global().async {
+        label.text = text
+    }
+}
+""",
+        bug_summary="UILabel.text is set on a global DispatchQueue, not the main actor",
+        bug_category="MainActor",
+        difficulty="intermediate",
+        hints=("DispatchQueue.main or MainActor",),
+        keywords=("DispatchQueue", "global", "UILabel", "main"),
     ),
     "cancel-ignore-flag": MockSnippet(
         code="""\
