@@ -346,6 +346,30 @@ func wait() async {
         hints=("Resume the continuation on every path",),
         keywords=("continuation", "resume", "hang", "leak"),
     ),
+    "conc-continuation-double": MockSnippet(
+        code="""\
+import Foundation
+func fetch(_ url: URL) async throws -> Data {
+    try await withCheckedThrowingContinuation { cont in
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            if let error {
+                cont.resume(throwing: error)
+            }
+            if let data {
+                cont.resume(returning: data)
+            } else {
+                cont.resume(throwing: URLError(.badServerResponse))
+            }
+        }.resume()
+    }
+}
+""",
+        bug_summary="After resume(throwing:) the callback falls through and may resume the same continuation again",
+        bug_category="concurrency",
+        difficulty="advanced",
+        hints=("Return after the first resume",),
+        keywords=("continuation", "resume", "twice", "double"),
+    ),
     "conc-task-loop": MockSnippet(
         code="""\
 func prefetch(_ urls: [URL]) async {
@@ -1142,6 +1166,24 @@ func paint(_ label: UILabel, _ text: String) {
         difficulty="intermediate",
         hints=("DispatchQueue.main or MainActor",),
         keywords=("DispatchQueue", "global", "UILabel", "main"),
+    ),
+    "main-await-hop": MockSnippet(
+        code="""\
+@MainActor
+final class Board {
+    var heading = ""
+    nonisolated func refresh() async {
+        let next = await Self.load()
+        heading = next
+    }
+    static nonisolated func load() async -> String { "ok" }
+}
+""",
+        bug_summary="nonisolated refresh assigns MainActor-isolated heading after await without hopping back",
+        bug_category="MainActor",
+        difficulty="advanced",
+        hints=("Mark refresh @MainActor or assign via MainActor.run",),
+        keywords=("MainActor", "nonisolated", "await", "heading"),
     ),
     "cancel-ignore-flag": MockSnippet(
         code="""\

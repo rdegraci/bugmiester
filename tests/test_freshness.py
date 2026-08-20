@@ -193,7 +193,7 @@ def test_seed_pool_has_thirty_two_categories_wired_to_mock_and_fallback() -> Non
         "exclusivity",
     }
     assert len(categories) == 32
-    assert len(SEED_POOL) == 87
+    assert len(SEED_POOL) == 89
     for seed in SEED_POOL:
         assert seed.seed_id in SEED_SNIPPETS
         mock = SEED_SNIPPETS[seed.seed_id]

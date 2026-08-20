@@ -64,7 +64,13 @@ GNARLY_CATEGORIES = frozenset(
     }
 )
 
-GNARLY_SEED_IDS = frozenset({"conc-continuation-stuck"})
+GNARLY_SEED_IDS = frozenset(
+    {
+        "conc-continuation-stuck",
+        "conc-continuation-double",
+        "main-await-hop",
+    }
+)
 
 SENIOR_CORE_CATEGORIES = frozenset(
     SENIOR_MIX_CATEGORIES - GNARLY_CATEGORIES
@@ -114,7 +120,7 @@ def senior_phase(used_count: int, bugs_per_round: int) -> str:
 
 
 def is_gnarly_seed(seed: object) -> bool:
-    """Reentrancy, exclusivity, or the stuck-continuation costume."""
+    """Reentrancy, exclusivity, or allowlisted hard concurrency / MainActor costumes."""
     seed_id = getattr(seed, "seed_id", None)
     if seed_id in GNARLY_SEED_IDS:
         return True

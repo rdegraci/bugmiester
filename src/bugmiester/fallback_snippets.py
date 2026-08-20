@@ -293,6 +293,28 @@ func fetch(_ url: URL) async -> Data {
         hints=("Resume on the failure path too",),
         keywords=("continuation", "resume", "nil", "hang"),
     ),
+    "conc-continuation-double": MockSnippet(
+        code="""\
+func bridge(_ work: (@escaping (Result<Int, Error>) -> Void) -> Void) async throws -> Int {
+    try await withCheckedThrowingContinuation { cont in
+        work { result in
+            switch result {
+            case .success(let value):
+                cont.resume(returning: value)
+                cont.resume(returning: value)
+            case .failure(let error):
+                cont.resume(throwing: error)
+            }
+        }
+    }
+}
+""",
+        bug_summary="The success path calls resume(returning:) twice on the same continuation",
+        bug_category="concurrency",
+        difficulty="advanced",
+        hints=("Resume exactly once",),
+        keywords=("continuation", "resume", "twice", "success"),
+    ),
     "conc-task-loop": MockSnippet(
         code="""\
 func warmup(_ ids: [Int]) async {
@@ -1087,6 +1109,24 @@ func round(_ view: UIView) {
         difficulty="intermediate",
         hints=("Hop to the main queue before touching layer",),
         keywords=("DispatchQueue", "global", "layer", "UIView"),
+    ),
+    "main-await-hop": MockSnippet(
+        code="""\
+@MainActor
+final class Meter {
+    var total = 0
+    nonisolated func ingest(_ n: Int) async {
+        let remote = await Self.pull()
+        total = remote + n
+    }
+    static nonisolated func pull() async -> Int { 1 }
+}
+""",
+        bug_summary="nonisolated ingest writes MainActor-isolated total after await without an actor hop",
+        bug_category="MainActor",
+        difficulty="advanced",
+        hints=("Keep ingest on the main actor",),
+        keywords=("MainActor", "nonisolated", "await", "total"),
     ),
     "cancel-ignore-flag": MockSnippet(
         code="""\

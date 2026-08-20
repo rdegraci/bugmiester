@@ -97,6 +97,12 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
         "must call withCheckedContinuation and skip resume on a path; not missing await",
     ),
     ScenarioSeed(
+        "conc-continuation-double",
+        "concurrency",
+        "checked continuation resumed twice",
+        "must resume the same continuation on two paths (e.g. missing return after resume); not a never-resume hang; not missing await",
+    ),
+    ScenarioSeed(
         "conc-task-loop",
         "concurrency",
         "unstructured Task inside a for-loop",
@@ -361,6 +367,12 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
         "MainActor",
         "UIKit updated from a global DispatchQueue",
         "must use DispatchQueue.global to touch UI; not Task; not URLSession dataTask; not @Published",
+    ),
+    ScenarioSeed(
+        "main-await-hop",
+        "MainActor",
+        "MainActor state written after await from a nonisolated method",
+        "must be a nonisolated async method on a MainActor type that assigns isolated state after await; not unstructured Task UI; not URLSession callback; not DispatchQueue.global",
     ),
     ScenarioSeed(
         "cancel-ignore-flag",
