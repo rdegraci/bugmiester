@@ -9,7 +9,10 @@ API keys stay on your machine. The browser never sees them.
 ## Features (MVP)
 
 - Free-text answers (not multiple choice)
+- Default mix `senior_mix`: Simple → Common → Gnarly across the round
+- Partial-credit recovery quiz when the first answer is close
 - Hybrid scoring: keywords first, then an LLM judge when needed
+- Code view: Swift syntax highlighting and line numbers
 - Providers: **OpenAI**, **Anthropic**, **xAI**, plus a **mock** provider for UI work
 - Fresh snippets: scenario seeds, avoid-list, similarity reject
 - Retry caps, canned fallbacks, and optional next-bug prefetch
@@ -52,7 +55,7 @@ python -m bugmiester
 
 4. Open [http://127.0.0.1:8765](http://127.0.0.1:8765).
 5. On first run the app creates `~/Library/Application Support/Bugmiester/` and copies `.env.example` → `.env` and `config.yaml.example` → `config.yaml` if missing.
-6. Put your provider key in `.env`. Set `llm.provider` and `llm.model` in `config.yaml` (start with `mock`).
+6. Put your provider key in `.env`. Set `llm.provider` and `llm.model` in `config.yaml` (use `mock` for offline UI work).
 7. Reload the game page and start a round.
 
 Ops: [http://127.0.0.1:8765/ops](http://127.0.0.1:8765/ops) and `python -m bugmiester analyze`.
@@ -64,7 +67,7 @@ Ops: [http://127.0.0.1:8765/ops](http://127.0.0.1:8765/ops) and `python -m bugmi
 | File | Role |
 |------|------|
 | `.env` | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY` |
-| `config.yaml` | Provider, model, scoring, freshness, server port |
+| `config.yaml` | Provider, model, mix, scoring, recovery, freshness, server port |
 | `reports/` | Player “bad snippet” reports |
 | `logs/` | Per-round metrics |
 
@@ -80,46 +83,51 @@ XAI_API_KEY=replace-me
 
 Fill the key that matches `llm.provider` in `config.yaml`.
 
-### Example `config.yaml` (shape)
+### Example `config.yaml` (common keys)
 
 ```yaml
 llm:
-  # Placeholder default — lock provider+model after the bakeoff (see below).
   provider: openai    # openai | anthropic | xai | mock
-  model: gpt-4o-mini
-  temperature: 0.4
+  model: gpt-5.6-terra
+  temperature: 0.55
   judge_temperature: 0.0
 
 game:
   bugs_per_round: 10
   language: swift
+  mix: senior_mix     # beginner_mix | intermediate_mix | senior_mix
 
 scoring:
   mode: hybrid
   points_per_bug: 10
   partial_credit: true
 
+recovery:
+  enabled: true       # partial-credit quiz; false = reveal and continue
+
 server:
   host: 127.0.0.1
   port: 8765
 ```
 
+See `config.yaml.example` for freshness, resilience, metrics, and other knobs.
+
 Defaults for xAI use the OpenAI-compatible base URL `https://api.x.ai/v1` when `base_url` is null.
 
-**Lock after bakeoff:** Keep `provider` / `model` in `config.yaml.example` and this README as placeholders until you finish the provider bakeoff, then set the chosen default in both places.
+Documented default: `openai` + `gpt-5.6-terra` (same as `config.yaml.example`).
 
 ## Provider bakeoff
 
-Before polishing UI or calling a live provider “the default,” run the same loop on each backend:
+To compare backends, run the same loop on each:
 
 1. **Mock** — full 10-bug round (UI, scoring, reports, ops) with `llm.provider: mock` (no API key).
-2. **OpenAI** — set `OPENAI_API_KEY`, `llm.provider: openai`, pick a model (e.g. `gpt-4o-mini`), play one full round.
+2. **OpenAI** — set `OPENAI_API_KEY`, `llm.provider: openai`, pick a model (default `gpt-5.6-terra`), play one full round.
 3. **Anthropic** — set `ANTHROPIC_API_KEY`, `llm.provider: anthropic`, pick a Claude model, play one full round.
 4. **xAI** — set `XAI_API_KEY`, `llm.provider: xai`, pick a Grok model (`base_url` defaults to `https://api.x.ai/v1`), play one full round.
 
-Use the same prompts/scoring. Note latency, snippet quality, duplicate feel, and scoring fairness. Then **lock** the winner as the documented default `provider` + `model` in `config.yaml.example` and this README.
+Use the same prompts and scoring. Note latency, snippet quality, duplicate feel, and scoring fairness. If you change the default, update `config.yaml.example` and this README together.
 
-CI does **not** require live OpenAI / Anthropic / xAI rounds. Offline golden eval (below) is enough for automated checks.
+CI does not require live OpenAI / Anthropic / xAI rounds. Offline golden eval (below) is enough for automated checks.
 
 ## Golden eval
 
@@ -137,14 +145,14 @@ pytest tests/test_golden_eval.py -q
 
 Options: `python -m bugmiester eval --json` · `python -m bugmiester eval --no-judge`.
 
-Re-run when you change prompts or scoring. Expand the case file toward ~20–30 as playtesting finds gaps. This is **not** post-MVP suggest/apply automation.
+Re-run when you change prompts or scoring. Expand the case file toward ~20–30 as playtesting finds gaps. This is not post-MVP suggest/apply automation.
 
 ## How a round works
 
-1. Start a round.
+1. Start a round. With `senior_mix`, bugs ramp Simple → Common → Gnarly.
 2. The server picks a scenario seed and asks the LLM for one buggy Swift snippet.
-3. You read the code and type the bug.
-4. The server scores your answer and shows the expected summary.
+3. Read the highlighted code (with line numbers) and type the bug.
+4. The server scores your answer. On a partial, you may get a short recovery quiz before the expected summary.
 5. Repeat for 10 bugs, then see the round total.
 
 ## Documentation

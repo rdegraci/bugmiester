@@ -5,7 +5,7 @@ llm:
   base_url: null
   # Prefer a fast/cheap model for generation (10 calls/round).
   # Lock provider+model after the bakeoff (see README).
-  model: gpt-4o-mini
+  model: gpt-5.6-terra
   temperature: 0.55
   judge_temperature: 0.0
   timeout_seconds: 60
