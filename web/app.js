@@ -236,27 +236,71 @@
     return out;
   }
 
+  function appendHighlighted(parent, tokens) {
+    for (let t = 0; t < tokens.length; t += 1) {
+      const tok = tokens[t];
+      if (tok.type === "plain") {
+        parent.appendChild(document.createTextNode(tok.value));
+      } else {
+        const span = document.createElement("span");
+        span.className = "tok-" + tok.type;
+        span.textContent = tok.value;
+        parent.appendChild(span);
+      }
+    }
+  }
+
+  function tokensByLine(source) {
+    const tokens = tokenizeSwift(source);
+    const lines = [[]];
+    for (let t = 0; t < tokens.length; t += 1) {
+      const tok = tokens[t];
+      const parts = String(tok.value).split("\n");
+      for (let p = 0; p < parts.length; p += 1) {
+        if (p > 0) {
+          lines.push([]);
+        }
+        if (parts[p]) {
+          lines[lines.length - 1].push({ type: tok.type, value: parts[p] });
+        }
+      }
+    }
+    return lines;
+  }
+
   function setCode(text) {
     // Model / API code must never use innerHTML.
     const root = els.codeContent;
     if (!root) return;
     root.replaceChildren();
     const source = text == null ? "" : String(text);
-    if (!source) {
-      root.appendChild(document.createTextNode(""));
-      return;
+    const lineTokens = source ? tokensByLine(source) : [[]];
+    // Drop a trailing empty line from a final newline.
+    if (
+      lineTokens.length > 1 &&
+      lineTokens[lineTokens.length - 1].length === 0 &&
+      source.endsWith("\n")
+    ) {
+      lineTokens.pop();
     }
-    const tokens = tokenizeSwift(source);
-    for (let t = 0; t < tokens.length; t += 1) {
-      const tok = tokens[t];
-      if (tok.type === "plain") {
-        root.appendChild(document.createTextNode(tok.value));
+    const width = String(Math.max(lineTokens.length, 1)).length;
+    for (let i = 0; i < lineTokens.length; i += 1) {
+      const row = document.createElement("div");
+      row.className = "code-line";
+      const no = document.createElement("span");
+      no.className = "line-no";
+      no.setAttribute("aria-hidden", "true");
+      no.textContent = String(i + 1).padStart(width, " ");
+      const code = document.createElement("span");
+      code.className = "line-code";
+      if (lineTokens[i].length) {
+        appendHighlighted(code, lineTokens[i]);
       } else {
-        const span = document.createElement("span");
-        span.className = "tok-" + tok.type;
-        span.textContent = tok.value;
-        root.appendChild(span);
+        code.appendChild(document.createTextNode(" "));
       }
+      row.appendChild(no);
+      row.appendChild(code);
+      root.appendChild(row);
     }
   }
 

@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Bugmiester</title>
     <link rel="stylesheet" href="vendor/bootstrap/bootstrap.min.css" />
-    <link rel="stylesheet" href="styles.css?v=20260820b" />
+    <link rel="stylesheet" href="styles.css?v=20260820c" />
   </head>
   <body class="d-flex flex-column min-vh-100">
     <main class="container py-4 flex-grow-1">
@@ -63,7 +63,19 @@
       </div>
 
       <section class="mb-3" aria-label="Code snippet">
-        <pre id="code-well" class="code-well mb-0"><code id="code-content">Start a round to load a Swift snippet.</code></pre>
+        <div
+          id="code-well"
+          class="code-well mb-0"
+          role="region"
+          aria-label="Swift snippet"
+        >
+          <div id="code-content" class="code-lines">
+            <div class="code-line">
+              <span class="line-no" aria-hidden="true">1</span>
+              <span class="line-code">Start a round to load a Swift snippet.</span>
+            </div>
+          </div>
+        </div>
       </section>
 
       <form id="answer-form" class="mb-3">
@@ -192,6 +204,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="app.js?v=20260820b"></script>
+    <script src="app.js?v=20260820c"></script>
   </body>
 </html>

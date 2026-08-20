@@ -49,14 +49,36 @@ body {
   line-height: 1.5;
   max-height: min(50vh, 28rem);
   overflow: auto;
-  padding: 1rem 1.1rem;
-  white-space: pre-wrap;
-  word-break: break-word;
+  padding: 0.75rem 0.6rem 0.75rem 0;
 }
 
-.code-well code {
+.code-lines {
+  margin: 0;
+  min-width: min-content;
+}
+
+.code-line {
+  display: flex;
+  align-items: flex-start;
+  min-height: 1.5em;
+}
+
+.line-no {
+  flex: 0 0 auto;
+  min-width: 2.5rem;
+  padding: 0 0.65rem 0 0.5rem;
+  text-align: right;
+  color: var(--bm-muted);
+  user-select: none;
+  opacity: 0.75;
+}
+
+.line-code {
+  flex: 1 1 auto;
+  padding-right: 1.1rem;
+  white-space: pre-wrap;
+  word-break: break-word;
   color: inherit;
-  font-family: inherit;
 }
 
 .tok-keyword {
