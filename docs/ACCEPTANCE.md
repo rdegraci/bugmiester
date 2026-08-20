@@ -22,7 +22,7 @@ Fix applied: setup banner now surfaces `app_dir` (with `env_path`, `missing_key`
 |-----------|--------|-------|
 | Complete 10-bug round on localhost without editing app code | **PASS** | Mock provider |
 | API keys stay on disk / in the Python process only | **PASS** | Keys only under Application Support / server process |
-| Switching `llm.provider` among openai / anthropic / grok works with matching key | **PASS** | Provider modules + 503-without-key + mocked HTTP tests; live keys not required for this pass |
+| Switching `llm.provider` among openai / anthropic / xai works with matching key | **PASS** | Provider modules + 503-without-key + mocked HTTP tests; live keys not required for this pass |
 | Documented default provider+model after bakeoff | **WAIVER** | Bakeoff not finished. `config.yaml.example` keeps provisional `openai` / `gpt-4o-mini`; README still says lock after bakeoff |
 | Each snippet has one intended bug + usable server-side answer key | **PASS** | Key held in round store; revealed only on submit |
 | Within a round, snippets are not near-duplicates | **PASS** | Freshness pipeline + 10/10 unique codes in acceptance mock round |

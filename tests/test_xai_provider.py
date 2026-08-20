@@ -1,4 +1,4 @@
-"""Slice 13: Grok (xAI) provider (mocked OpenAI-compatible client)."""
+"""Slice 13: xAI provider (mocked OpenAI-compatible client)."""
 
 from __future__ import annotations
 
@@ -14,16 +14,16 @@ from fastapi.testclient import TestClient
 from bugmiester.app import create_app
 from bugmiester.config import ensure_app_dir, load_settings
 from bugmiester.llm import generate_bug
-from bugmiester.llm.grok_provider import (
-    DEFAULT_GROK_BASE_URL,
-    GrokConfigError,
+from bugmiester.llm.xai_provider import (
+    DEFAULT_XAI_BASE_URL,
+    XaiConfigError,
     generate_raw,
     judge_raw,
     resolve_base_url,
 )
 
 
-def _settings_with_grok(
+def _settings_with_xai(
     tmp_path: Path,
     monkeypatch,
     *,
@@ -34,7 +34,7 @@ def _settings_with_grok(
     examples = tmp_path / "examples"
     examples.mkdir()
     (examples / ".env.example").write_text(
-        "OPENAI_API_KEY=replace-me\nANTHROPIC_API_KEY=replace-me\nGROK_API_KEY=replace-me\n",
+        "OPENAI_API_KEY=replace-me\nANTHROPIC_API_KEY=replace-me\nXAI_API_KEY=replace-me\n",
         encoding="utf-8",
     )
     repo_example = Path(__file__).resolve().parents[1] / "config.yaml.example"
@@ -44,9 +44,9 @@ def _settings_with_grok(
     )
     app_dir = tmp_path / "app"
     ensure_app_dir(app_dir=app_dir, examples_dir=examples)
-    (app_dir / ".env").write_text(f"GROK_API_KEY={api_key}\n", encoding="utf-8")
+    (app_dir / ".env").write_text(f"XAI_API_KEY={api_key}\n", encoding="utf-8")
     raw = yaml.safe_load((app_dir / "config.yaml").read_text(encoding="utf-8"))
-    raw["llm"]["provider"] = "grok"
+    raw["llm"]["provider"] = "xai"
     raw["llm"]["model"] = model
     raw["llm"]["base_url"] = base_url
     (app_dir / "config.yaml").write_text(
@@ -65,29 +65,29 @@ def _completion(content: str) -> SimpleNamespace:
 
 
 def test_resolve_base_url_defaults_to_xai(tmp_path: Path, monkeypatch) -> None:
-    settings = _settings_with_grok(tmp_path, monkeypatch, base_url=None)
-    assert resolve_base_url(settings) == DEFAULT_GROK_BASE_URL
-    assert DEFAULT_GROK_BASE_URL == "https://api.x.ai/v1"
+    settings = _settings_with_xai(tmp_path, monkeypatch, base_url=None)
+    assert resolve_base_url(settings) == DEFAULT_XAI_BASE_URL
+    assert DEFAULT_XAI_BASE_URL == "https://api.x.ai/v1"
 
 
 def test_resolve_base_url_honors_override(tmp_path: Path, monkeypatch) -> None:
-    settings = _settings_with_grok(
+    settings = _settings_with_xai(
         tmp_path, monkeypatch, base_url="https://example.test/v1/"
     )
     assert resolve_base_url(settings) == "https://example.test/v1"
 
 
 def test_generate_raw_missing_key_raises(tmp_path: Path, monkeypatch) -> None:
-    settings = _settings_with_grok(tmp_path, monkeypatch, api_key="replace-me")
+    settings = _settings_with_xai(tmp_path, monkeypatch, api_key="replace-me")
     assert settings.config_ready is False
-    with pytest.raises(GrokConfigError, match="GROK_API_KEY"):
+    with pytest.raises(XaiConfigError, match="XAI_API_KEY"):
         generate_raw("prompt", settings)
 
 
 def test_generate_and_judge_use_json_mode_and_default_base(
     tmp_path: Path, monkeypatch
 ) -> None:
-    settings = _settings_with_grok(tmp_path, monkeypatch, base_url=None)
+    settings = _settings_with_xai(tmp_path, monkeypatch, base_url=None)
     assert settings.config_ready is True
 
     gen_payload = {
@@ -119,13 +119,13 @@ def test_generate_and_judge_use_json_mode_and_default_base(
         return client
 
     monkeypatch.setattr(
-        "bugmiester.llm.grok_provider._build_client",
+        "bugmiester.llm.xai_provider._build_client",
         _fake_build,
     )
 
     raw = generate_raw("gen prompt", settings)
     assert json.loads(raw)["bug_summary"] == "Force unwrap of y"
-    assert built["base_url"] == DEFAULT_GROK_BASE_URL
+    assert built["base_url"] == DEFAULT_XAI_BASE_URL
     first_kwargs = create_mock.call_args_list[0].kwargs
     assert first_kwargs["model"] == "grok-2-latest"
     assert first_kwargs["temperature"] == settings.llm.temperature
@@ -137,8 +137,8 @@ def test_generate_and_judge_use_json_mode_and_default_base(
     assert second_kwargs["temperature"] == settings.llm.judge_temperature
 
 
-def test_facade_grok_generate_bug(tmp_path: Path, monkeypatch) -> None:
-    settings = _settings_with_grok(tmp_path, monkeypatch)
+def test_facade_xai_generate_bug(tmp_path: Path, monkeypatch) -> None:
+    settings = _settings_with_xai(tmp_path, monkeypatch)
     gen_payload = {
         "code": "let a = b!",
         "bug_summary": "Force unwrap of optional b",
@@ -152,7 +152,7 @@ def test_facade_grok_generate_bug(tmp_path: Path, monkeypatch) -> None:
         return_value=_completion(json.dumps(gen_payload))
     )
     monkeypatch.setattr(
-        "bugmiester.llm.grok_provider._build_client",
+        "bugmiester.llm.xai_provider._build_client",
         lambda _settings: client,
     )
 
@@ -161,8 +161,8 @@ def test_facade_grok_generate_bug(tmp_path: Path, monkeypatch) -> None:
     assert outcome.degraded is False
 
 
-def test_round_api_grok_mocked_no_key_leak(tmp_path: Path, monkeypatch) -> None:
-    settings = _settings_with_grok(tmp_path, monkeypatch)
+def test_round_api_xai_mocked_no_key_leak(tmp_path: Path, monkeypatch) -> None:
+    settings = _settings_with_xai(tmp_path, monkeypatch)
     payloads = [
         {
             "code": 'func firstName(from dict: [String: String]) -> String { return dict["name"]! }',
@@ -205,7 +205,7 @@ def test_round_api_grok_mocked_no_key_leak(tmp_path: Path, monkeypatch) -> None:
     client = MagicMock()
     client.chat.completions.create = create_mock
     monkeypatch.setattr(
-        "bugmiester.llm.grok_provider._build_client",
+        "bugmiester.llm.xai_provider._build_client",
         lambda _settings: client,
     )
 
@@ -238,11 +238,11 @@ def test_round_api_grok_mocked_no_key_leak(tmp_path: Path, monkeypatch) -> None:
             assert result["points_possible"] == 10
 
 
-def test_round_grok_missing_key_503(tmp_path: Path, monkeypatch) -> None:
-    settings = _settings_with_grok(tmp_path, monkeypatch, api_key="replace-me")
+def test_round_xai_missing_key_503(tmp_path: Path, monkeypatch) -> None:
+    settings = _settings_with_xai(tmp_path, monkeypatch, api_key="replace-me")
     app = create_app(settings=settings)
     with TestClient(app) as http:
         round_id = http.post("/api/round/start").json()["round_id"]
         response = http.post("/api/round/next-bug", json={"round_id": round_id})
         assert response.status_code == 503
-        assert "GROK_API_KEY" in response.json()["detail"]["message"]
+        assert "XAI_API_KEY" in response.json()["detail"]["message"]

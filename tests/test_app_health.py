@@ -17,7 +17,7 @@ def _examples(tmp_path: Path) -> Path:
     (examples / ".env.example").write_text(
         "OPENAI_API_KEY=replace-me\n"
         "ANTHROPIC_API_KEY=replace-me\n"
-        "GROK_API_KEY=replace-me\n",
+        "XAI_API_KEY=replace-me\n",
         encoding="utf-8",
     )
     # Reuse repo example YAML for realism.

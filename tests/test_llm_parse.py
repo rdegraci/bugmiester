@@ -224,7 +224,7 @@ def _mock_settings(tmp_path: Path, monkeypatch):
     examples = tmp_path / "examples"
     examples.mkdir()
     (examples / ".env.example").write_text(
-        "OPENAI_API_KEY=replace-me\nANTHROPIC_API_KEY=replace-me\nGROK_API_KEY=replace-me\n",
+        "OPENAI_API_KEY=replace-me\nANTHROPIC_API_KEY=replace-me\nXAI_API_KEY=replace-me\n",
         encoding="utf-8",
     )
     repo_example = Path(__file__).resolve().parents[1] / "config.yaml.example"
@@ -303,8 +303,8 @@ def test_all_live_providers_need_keys(tmp_path: Path, monkeypatch) -> None:
     with pytest.raises(AnthropicConfigError):
         generate_bug(anthropic_settings, used_seed_ids=set(), history=[])
 
-    grok_settings = replace(settings, llm=replace(settings.llm, provider="grok"))
-    from bugmiester.llm.grok_provider import GrokConfigError
+    xai_settings = replace(settings, llm=replace(settings.llm, provider="xai"))
+    from bugmiester.llm.xai_provider import XaiConfigError
 
-    with pytest.raises(GrokConfigError):
-        generate_bug(grok_settings, used_seed_ids=set(), history=[])
+    with pytest.raises(XaiConfigError):
+        generate_bug(xai_settings, used_seed_ids=set(), history=[])

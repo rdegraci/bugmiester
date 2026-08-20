@@ -1,6 +1,6 @@
 # Golden eval
 
-Golden eval is an offline check for Bugmiester scoring. It does not start a round. It does not call OpenAI, Anthropic, or Grok.
+Golden eval is an offline check for Bugmiester scoring. It does not start a round. It does not call OpenAI, Anthropic, or xAI.
 
 Use it when you change keywords, hybrid scoring, or the mock judge. The goal is to catch unfair score changes before you play live rounds.
 

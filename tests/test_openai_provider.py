@@ -26,7 +26,7 @@ def _settings_with_openai(tmp_path: Path, monkeypatch, *, api_key: str = "sk-tes
     examples = tmp_path / "examples"
     examples.mkdir()
     (examples / ".env.example").write_text(
-        "OPENAI_API_KEY=replace-me\nANTHROPIC_API_KEY=replace-me\nGROK_API_KEY=replace-me\n",
+        "OPENAI_API_KEY=replace-me\nANTHROPIC_API_KEY=replace-me\nXAI_API_KEY=replace-me\n",
         encoding="utf-8",
     )
     repo_example = Path(__file__).resolve().parents[1] / "config.yaml.example"

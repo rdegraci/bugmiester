@@ -100,12 +100,12 @@ def _live_generate_raw(provider: str, prompt: str, settings: Settings) -> str:
         from bugmiester.llm import anthropic_provider
 
         return anthropic_provider.generate_raw(prompt, settings)
-    if provider == "grok":
-        from bugmiester.llm import grok_provider
+    if provider == "xai":
+        from bugmiester.llm import xai_provider
 
-        return grok_provider.generate_raw(prompt, settings)
+        return xai_provider.generate_raw(prompt, settings)
     raise ProviderNotImplementedError(
-        f"Unknown llm.provider '{provider}'. Expected openai|anthropic|grok|mock."
+        f"Unknown llm.provider '{provider}'. Expected openai|anthropic|xai|mock."
     )
 
 
@@ -209,14 +209,14 @@ def judge_answer(
 
         raw = anthropic_provider.judge_raw(prompt, settings)
         return parse_judge_payload(raw)
-    if provider == "grok":
-        from bugmiester.llm import grok_provider
+    if provider == "xai":
+        from bugmiester.llm import xai_provider
 
-        raw = grok_provider.judge_raw(prompt, settings)
+        raw = xai_provider.judge_raw(prompt, settings)
         return parse_judge_payload(raw)
 
     raise ProviderNotImplementedError(
-        f"Unknown llm.provider '{provider}'. Expected openai|anthropic|grok|mock."
+        f"Unknown llm.provider '{provider}'. Expected openai|anthropic|xai|mock."
     )
 
 
@@ -270,12 +270,12 @@ def generate_recovery_distractors(
             from bugmiester.llm import anthropic_provider
 
             return anthropic_provider.recovery_raw(prompt, settings)
-        if provider == "grok":
-            from bugmiester.llm import grok_provider
+        if provider == "xai":
+            from bugmiester.llm import xai_provider
 
-            return grok_provider.recovery_raw(prompt, settings)
+            return xai_provider.recovery_raw(prompt, settings)
         raise ProviderNotImplementedError(
-            f"Unknown llm.provider '{provider}'. Expected openai|anthropic|grok|mock."
+            f"Unknown llm.provider '{provider}'. Expected openai|anthropic|xai|mock."
         )
 
     try:

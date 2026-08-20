@@ -1,4 +1,4 @@
-"""Grok (xAI) provider via OpenAI-compatible Chat Completions."""
+"""xAI provider via OpenAI-compatible Chat Completions."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import Any
 
 from bugmiester.config import Settings
 
-DEFAULT_GROK_BASE_URL = "https://api.x.ai/v1"
+DEFAULT_XAI_BASE_URL = "https://api.x.ai/v1"
 
 # Same JSON contracts as the OpenAI path / shared parse layer.
 GENERATION_JSON_SCHEMA: dict[str, Any] = {
@@ -55,12 +55,12 @@ RECOVERY_JSON_SCHEMA: dict[str, Any] = {
 }
 
 
-class GrokConfigError(RuntimeError):
-    """Missing / unusable Grok (xAI) API key."""
+class XaiConfigError(RuntimeError):
+    """Missing / unusable xAI API key."""
 
 
-class GrokRequestError(RuntimeError):
-    """Grok API call failed."""
+class XaiRequestError(RuntimeError):
+    """xAI API call failed."""
 
 
 def resolve_base_url(settings: Settings) -> str:
@@ -68,14 +68,14 @@ def resolve_base_url(settings: Settings) -> str:
     override = settings.llm.base_url
     if override is not None and str(override).strip():
         return str(override).strip().rstrip("/")
-    return DEFAULT_GROK_BASE_URL
+    return DEFAULT_XAI_BASE_URL
 
 
 def _require_api_key(settings: Settings) -> str:
     key = (settings.api_key or "").strip()
     if not key or not settings.config_ready:
-        raise GrokConfigError(
-            "GROK_API_KEY is missing or still a placeholder. "
+        raise XaiConfigError(
+            "XAI_API_KEY is missing or still a placeholder. "
             f"Set it in {settings.env_path}"
         )
     return key
@@ -139,11 +139,11 @@ def _chat_json(
             choice = response.choices[0]
             content = choice.message.content
             if not content or not str(content).strip():
-                raise GrokRequestError("Grok returned empty content")
+                raise XaiRequestError("xAI returned empty content")
             return str(content)
-        except GrokConfigError:
+        except XaiConfigError:
             raise
-        except GrokRequestError:
+        except XaiRequestError:
             raise
         except Exception as exc:  # noqa: BLE001 — map SDK / HTTP errors
             last_error = exc
@@ -155,13 +155,13 @@ def _chat_json(
                 or "unsupported" in message
             ):
                 continue
-            raise GrokRequestError(f"Grok request failed: {exc}") from exc
+            raise XaiRequestError(f"xAI request failed: {exc}") from exc
 
-    raise GrokRequestError(f"Grok request failed: {last_error}")
+    raise XaiRequestError(f"xAI request failed: {last_error}")
 
 
 def generate_raw(prompt: str, settings: Settings) -> str:
-    """Call Grok for generation JSON (model/temperature/timeout from config)."""
+    """Call xAI for generation JSON (model/temperature/timeout from config)."""
     return _chat_json(
         settings,
         system=(
@@ -176,7 +176,7 @@ def generate_raw(prompt: str, settings: Settings) -> str:
 
 
 def judge_raw(prompt: str, settings: Settings) -> str:
-    """Call Grok for judge JSON (uses judge_temperature)."""
+    """Call xAI for judge JSON (uses judge_temperature)."""
     return _chat_json(
         settings,
         system=(
@@ -191,7 +191,7 @@ def judge_raw(prompt: str, settings: Settings) -> str:
 
 
 def recovery_raw(prompt: str, settings: Settings) -> str:
-    """Call Grok for recovery distractors (short timeout)."""
+    """Call xAI for recovery distractors (short timeout)."""
     return _chat_json(
         settings,
         system=(

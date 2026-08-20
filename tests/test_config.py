@@ -19,7 +19,7 @@ def _write_examples(examples: Path) -> None:
     (examples / ".env.example").write_text(
         "OPENAI_API_KEY=replace-me\n"
         "ANTHROPIC_API_KEY=replace-me\n"
-        "GROK_API_KEY=replace-me\n",
+        "XAI_API_KEY=replace-me\n",
         encoding="utf-8",
     )
     config = {
@@ -116,7 +116,7 @@ def test_load_settings_real_key_ready(tmp_path: Path) -> None:
     (app_dir / ".env").write_text(
         "OPENAI_API_KEY=sk-test-real\n"
         "ANTHROPIC_API_KEY=replace-me\n"
-        "GROK_API_KEY=replace-me\n",
+        "XAI_API_KEY=replace-me\n",
         encoding="utf-8",
     )
 
@@ -173,5 +173,5 @@ def test_resolve_provider_key_helpers() -> None:
         "anthropic", {"ANTHROPIC_API_KEY": "claude-key"}
     ) == ("claude-key", None, True)
     assert resolve_provider_key(
-        "grok", {"GROK_API_KEY": "xai-key"}
+        "xai", {"XAI_API_KEY": "xai-key"}
     ) == ("xai-key", None, True)

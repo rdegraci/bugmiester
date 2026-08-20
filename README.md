@@ -10,7 +10,7 @@ API keys stay on your machine. The browser never sees them.
 
 - Free-text answers (not multiple choice)
 - Hybrid scoring: keywords first, then an LLM judge when needed
-- Providers: **OpenAI**, **Anthropic**, **Grok** (xAI), plus a **mock** provider for UI work
+- Providers: **OpenAI**, **Anthropic**, **xAI**, plus a **mock** provider for UI work
 - Fresh snippets: scenario seeds, avoid-list, similarity reject
 - Retry caps, canned fallbacks, and optional next-bug prefetch
 - Report bad snippets; local metrics under Application Support
@@ -63,7 +63,7 @@ Ops: [http://127.0.0.1:8765/ops](http://127.0.0.1:8765/ops) and `python -m bugmi
 
 | File | Role |
 |------|------|
-| `.env` | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GROK_API_KEY` |
+| `.env` | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY` |
 | `config.yaml` | Provider, model, scoring, freshness, server port |
 | `reports/` | Player “bad snippet” reports |
 | `logs/` | Per-round metrics |
@@ -75,7 +75,7 @@ Repo examples (copy sources): `.env.example`, `config.yaml.example`.
 ```bash
 OPENAI_API_KEY=replace-me
 ANTHROPIC_API_KEY=replace-me
-GROK_API_KEY=replace-me
+XAI_API_KEY=replace-me
 ```
 
 Fill the key that matches `llm.provider` in `config.yaml`.
@@ -85,7 +85,7 @@ Fill the key that matches `llm.provider` in `config.yaml`.
 ```yaml
 llm:
   # Placeholder default — lock provider+model after the bakeoff (see below).
-  provider: openai    # openai | anthropic | grok | mock
+  provider: openai    # openai | anthropic | xai | mock
   model: gpt-4o-mini
   temperature: 0.4
   judge_temperature: 0.0
@@ -104,7 +104,7 @@ server:
   port: 8765
 ```
 
-Defaults for Grok use the xAI OpenAI-compatible base URL `https://api.x.ai/v1` when `base_url` is null.
+Defaults for xAI use the OpenAI-compatible base URL `https://api.x.ai/v1` when `base_url` is null.
 
 **Lock after bakeoff:** Keep `provider` / `model` in `config.yaml.example` and this README as placeholders until you finish the provider bakeoff, then set the chosen default in both places.
 
@@ -115,11 +115,11 @@ Before polishing UI or calling a live provider “the default,” run the same l
 1. **Mock** — full 10-bug round (UI, scoring, reports, ops) with `llm.provider: mock` (no API key).
 2. **OpenAI** — set `OPENAI_API_KEY`, `llm.provider: openai`, pick a model (e.g. `gpt-4o-mini`), play one full round.
 3. **Anthropic** — set `ANTHROPIC_API_KEY`, `llm.provider: anthropic`, pick a Claude model, play one full round.
-4. **Grok** — set `GROK_API_KEY`, `llm.provider: grok`, pick a Grok model (`base_url` defaults to `https://api.x.ai/v1`), play one full round.
+4. **xAI** — set `XAI_API_KEY`, `llm.provider: xai`, pick a Grok model (`base_url` defaults to `https://api.x.ai/v1`), play one full round.
 
 Use the same prompts/scoring. Note latency, snippet quality, duplicate feel, and scoring fairness. Then **lock** the winner as the documented default `provider` + `model` in `config.yaml.example` and this README.
 
-CI does **not** require live OpenAI / Anthropic / Grok rounds. Offline golden eval (below) is enough for automated checks.
+CI does **not** require live OpenAI / Anthropic / xAI rounds. Offline golden eval (below) is enough for automated checks.
 
 ## Golden eval
 

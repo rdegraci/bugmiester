@@ -18,7 +18,7 @@ PLACEHOLDER_KEY = "replace-me"
 PROVIDER_ENV_KEYS: dict[str, str | None] = {
     "openai": "OPENAI_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
-    "grok": "GROK_API_KEY",
+    "xai": "XAI_API_KEY",
     "mock": None,
 }
 

@@ -1,5 +1,5 @@
 llm:
-  # openai | anthropic | grok | mock — lock default after bakeoff (see README)
+  # openai | anthropic | xai | mock — lock default after bakeoff (see README)
   provider: openai
   # Optional override; defaults applied per provider when null
   base_url: null
