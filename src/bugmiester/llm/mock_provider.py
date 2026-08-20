@@ -671,6 +671,25 @@ struct Knob: Resettable {
         hints=("Need mutating func reset",),
         keywords=("mutating", "protocol", "witness", "struct"),
     ),
+    "proto-static-dispatch": MockSnippet(
+        code="""\
+protocol Worker {}
+extension Worker {
+    func start() { print("default") }
+}
+struct Job: Worker {
+    func start() { print("job") }
+}
+func run(_ worker: Worker) {
+    worker.start()
+}
+""",
+        bug_summary="start() is not a protocol requirement, so run calls the extension and never Job.start",
+        bug_category="protocol witnesses",
+        difficulty="advanced",
+        hints=("Declare start() on Worker",),
+        keywords=("extension", "existential", "static", "requirement"),
+    ),
     "res-optional-result": MockSnippet(
         code="""\
 func label(_ result: Result<String, Error>) -> String {

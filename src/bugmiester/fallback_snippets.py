@@ -609,6 +609,28 @@ struct Clock: Tick {
         hints=("mutating func tick",),
         keywords=("mutating", "protocol", "tick", "struct"),
     ),
+    "proto-static-dispatch": MockSnippet(
+        code="""\
+protocol Label {
+    var text: String { get }
+}
+extension Label {
+    func tag() -> String { text }
+}
+struct User: Label {
+    var text: String
+    func tag() -> String { "user:" + text }
+}
+func show(_ item: Label) -> String {
+    item.tag()
+}
+""",
+        bug_summary="tag() lives only in the extension, so show(User) returns text, not user:text",
+        bug_category="protocol witnesses",
+        difficulty="advanced",
+        hints=("Add tag() to the protocol",),
+        keywords=("extension", "protocol", "dispatch", "tag"),
+    ),
     "res-optional-result": MockSnippet(
         code="""\
 func value(_ result: Result<Int, Error>) -> Int {

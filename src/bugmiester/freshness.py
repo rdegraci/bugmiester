@@ -165,6 +165,12 @@ SEED_POOL: tuple[ScenarioSeed, ...] = (
         "must involve a protocol mutating requirement",
     ),
     ScenarioSeed(
+        "proto-static-dispatch",
+        "protocol witnesses",
+        "extension method shadows the type's method on an existential",
+        "must call a method that is not a protocol requirement through the protocol type; not a wrong witness name; not some/any",
+    ),
+    ScenarioSeed(
         "res-optional-result",
         "result",
         "Result treated as Optional",
