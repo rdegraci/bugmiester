@@ -126,6 +126,8 @@ def test_prompts_include_seed_and_avoid_list() -> None:
     assert "Not a tutorial" in prompt
     assert "must contain no comments" in prompt
     assert "failure mode" in prompt
+    assert "Costume variation" in prompt
+    assert "Keep the same bug class; change the costume" in prompt
     assert seed.seed_id in prompt
     assert "bug_summary" in prompt
 

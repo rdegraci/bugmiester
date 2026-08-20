@@ -55,6 +55,9 @@ Work in this order. Do not put the correct version in the JSON:
 
 Rules:
 - The bug must fit this seed's category. Do not substitute a generic force-unwrap or missing await unless the category requires it.
+- Honor any seed constraint exactly. Keep the same bug class; change the costume.
+- Costume variation (required): invent a fresh surface each time — different type/function names, domain, and API shape. Do not reuse a stock textbook skeleton for this seed (for example the same URLSession+continuation, Counter actor, or Board/@MainActor demo). Prefer an uncommon but realistic setting that still demonstrates the seed.
+- Vary control-flow shape when the constraint still holds (different branching, callback style, or call sites) so the snippet does not look like a near-clone of a common sample.
 - No multiple interacting defects.
 - The JSON "code" must contain the bug. Do not return the correct snippet.
 - "code" must contain no comments (no //, no /* */, no ///). Do not label the bug in the source. Put any hint only in "hints".
