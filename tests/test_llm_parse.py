@@ -80,6 +80,34 @@ def test_parse_generation_rejects_comment_only_code() -> None:
         )
 
 
+def test_parse_generation_rejects_over_max_lines() -> None:
+    body = "\n".join(f"let x{i} = {i}" for i in range(61))
+    with pytest.raises(ParseError, match="60"):
+        parse_generation_payload(
+            {
+                "code": body,
+                "bug_summary": "Force unwrap",
+                "bug_category": "optionals",
+                "difficulty": "beginner",
+                "hints": ["!"],
+            }
+        )
+
+
+def test_parse_generation_allows_sixty_lines() -> None:
+    body = "\n".join(f"let x{i} = {i}" for i in range(60))
+    snippet = parse_generation_payload(
+        {
+            "code": body + "\n",
+            "bug_summary": "Force unwrap",
+            "bug_category": "optionals",
+            "difficulty": "beginner",
+            "hints": ["!"],
+        }
+    )
+    assert "let x0" in snippet.code
+
+
 def test_parse_generation_rejects_invalid_json() -> None:
     with pytest.raises(ParseError, match="Invalid JSON"):
         parse_generation_payload("not-json{")
@@ -128,6 +156,10 @@ def test_prompts_include_seed_and_avoid_list() -> None:
     assert "failure mode" in prompt
     assert "Costume variation" in prompt
     assert "Keep the same bug class; change the costume" in prompt
+    assert "Stealth (required)" in prompt
+    assert "No puzzle tells" in prompt
+    assert "never exceed 60 lines" in prompt
+    assert "25–40 lines" in prompt or "25-40 lines" in prompt
     assert seed.seed_id in prompt
     assert "bug_summary" in prompt
 

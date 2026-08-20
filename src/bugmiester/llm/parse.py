@@ -16,6 +16,10 @@ REQUIRED_GENERATION_KEYS = (
     "hints",
 )
 
+# Soft target in the generate prompt is ~25–40 lines; hard reject above this.
+MAX_CODE_LINES = 60
+MAX_CODE_CHARS = 4000
+
 
 class ParseError(ValueError):
     """Raised when model output is not usable generation/judge JSON."""
@@ -131,10 +135,23 @@ def _strip_line_comment(line: str) -> str:
     return line
 
 
+def _code_line_count(code: str) -> int:
+    """Physical lines, ignoring a single trailing empty line from a final newline."""
+    lines = code.splitlines()
+    while lines and not lines[-1].strip():
+        lines.pop()
+    return len(lines)
+
+
 def _one_bug_smell(code: str, summary: str) -> None:
     """Reject obvious multi-bug / oversized payloads (light MVP checks)."""
-    if len(code) > 4000:
+    if len(code) > MAX_CODE_CHARS:
         raise ParseError("code is too large for MVP")
+    lines = _code_line_count(code)
+    if lines > MAX_CODE_LINES:
+        raise ParseError(
+            f"code has {lines} lines; maximum is {MAX_CODE_LINES}"
+        )
     upper = code.upper()
     if "BUG 1" in upper and "BUG 2" in upper:
         raise ParseError("code appears to contain multiple labeled bugs")

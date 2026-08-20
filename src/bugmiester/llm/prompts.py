@@ -58,11 +58,15 @@ Rules:
 - Honor any seed constraint exactly. Keep the same bug class; change the costume.
 - Costume variation (required): invent a fresh surface each time — different type/function names, domain, and API shape. Do not reuse a stock textbook skeleton for this seed (for example the same URLSession+continuation, Counter actor, or Board/@MainActor demo). Prefer an uncommon but realistic setting that still demonstrates the seed.
 - Vary control-flow shape when the constraint still holds (different branching, callback style, or call sites) so the snippet does not look like a near-clone of a common sample.
+- Stealth (required): the snippet must look like ordinary production {language} if the bug were fixed. Do not telegraph the defect.
+- No puzzle tells: no suspicious names (e.g. unsafe, force, bug, broken, wrong), no dead decoy lines, no "look here" structure, no contrived one-liner that exists only to showcase the bug.
+- Bury the defect in a short stretch of normal surrounding logic (a few innocent lines or a realistic call path) while staying one screen. Prefer bugs that require reading how pieces interact, not spotting one glaring token in isolation — still honor the seed constraint.
+- Length: prefer about 25–40 lines of {language}. Aim under 40 lines; never exceed 60 lines.
 - No multiple interacting defects.
 - The JSON "code" must contain the bug. Do not return the correct snippet.
 - "code" must contain no comments (no //, no /* */, no ///). Do not label the bug in the source. Put any hint only in "hints".
 - "bug_summary" is one short sentence that names the defect. Not a tutorial. Not the fix.
-- Short enough to read on one screen.
+- Short enough to read carefully in under a minute (one screen on a laptop).
 - Do NOT reuse or near-duplicate anything on the avoid-list.
 - Do not reuse an avoid-list failure mode (for example a second force-unwrap, a second missing await, or a second empty-array crash).
 
