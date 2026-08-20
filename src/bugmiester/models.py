@@ -6,6 +6,9 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+# Keep in sync with answer textarea maxlength and prompt sanitizer.
+MAX_PLAYER_ANSWER_CHARS = 1000
+
 
 class RoundStartResponse(BaseModel):
     round_id: str
@@ -37,7 +40,7 @@ class NextBugResponse(BaseModel):
 class SubmitRequest(BaseModel):
     round_id: str
     snippet_id: str
-    answer: str = Field(min_length=1)
+    answer: str = Field(min_length=1, max_length=MAX_PLAYER_ANSWER_CHARS)
 
 
 class RoundSummary(BaseModel):

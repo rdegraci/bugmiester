@@ -262,3 +262,22 @@ def test_next_bug_rejects_openai_without_key(tmp_path: Path, monkeypatch) -> Non
         response = client.post("/api/round/next-bug", json={"round_id": round_id})
         assert response.status_code == 503
         assert "OPENAI_API_KEY" in response.json()["detail"]["message"]
+
+
+def test_submit_rejects_overlong_answer(tmp_path: Path, monkeypatch) -> None:
+    from bugmiester.models import MAX_PLAYER_ANSWER_CHARS
+
+    settings = _mock_settings(tmp_path, monkeypatch)
+    app = create_app(settings=settings)
+    with TestClient(app) as client:
+        round_id = client.post("/api/round/start").json()["round_id"]
+        bug = client.post("/api/round/next-bug", json={"round_id": round_id}).json()
+        response = client.post(
+            "/api/round/submit",
+            json={
+                "round_id": round_id,
+                "snippet_id": bug["snippet_id"],
+                "answer": "x" * (MAX_PLAYER_ANSWER_CHARS + 1),
+            },
+        )
+        assert response.status_code == 422

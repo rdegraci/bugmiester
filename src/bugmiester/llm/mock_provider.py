@@ -1636,15 +1636,15 @@ class MockProvider:
         if code_match:
             code = code_match.group(1)
         expected_match = re.search(
-            r"Expected bug summary:\n([\s\S]*?)\n\nPlayer answer:", prompt
+            r"Expected bug summary[^\n]*:\n([\s\S]*?)\n\nPlayer answer", prompt
         )
         if expected_match:
             expected = expected_match.group(1).strip()
         answer_match = re.search(
-            r"Player answer:\n([\s\S]*?)\n\nReturn ONLY valid JSON", prompt
+            r"<<<PLAYER_ANSWER>>>\n([\s\S]*?)\n<<<END_PLAYER_ANSWER>>>", prompt
         )
         if answer_match:
-            answer = answer_match.group(1).strip()
+            answer = answer_match.group(1)
         judged = self.judge_answer(code, expected, answer)
         return json.dumps(
             {
@@ -1739,7 +1739,7 @@ class MockProvider:
             expected = expected_match.group(1).strip()
         player = ""
         player_match = re.search(
-            r"Player partial answer[^\n]*:\n([\s\S]*?)\n\nReturn ONLY",
+            r"<<<PLAYER_ANSWER>>>\n([\s\S]*?)\n<<<END_PLAYER_ANSWER>>>",
             prompt,
         )
         if player_match:
