@@ -621,6 +621,10 @@ def pick_seed(
     mix: str = "intermediate_mix",
     bugs_per_round: int = 10,
     adaptation_enabled: bool = False,
+    cluster_misses: int = 0,
+    miss_threshold: int = 2,
+    max_delayed_gnarly: int = 1,
+    adaptation_cluster: str = "isolation",
 ) -> ScenarioSeed:
     """
     Next unused seed, preferring categories still under the per-round cap.
@@ -649,6 +653,10 @@ def pick_seed(
         used_seeds,
         bugs_per_round=bugs_per_round,
         adaptation_enabled=adaptation_enabled,
+        cluster_misses=cluster_misses,
+        miss_threshold=miss_threshold,
+        max_delayed_gnarly=max_delayed_gnarly,
+        adaptation_cluster=adaptation_cluster,
     )
     gnarly_only = (
         normalize_mix(mix) == "senior_mix"
@@ -657,6 +665,9 @@ def pick_seed(
             bugs_per_round,
             mix=mix,
             adaptation_enabled=adaptation_enabled,
+            cluster_misses=cluster_misses,
+            miss_threshold=miss_threshold,
+            max_delayed_gnarly=max_delayed_gnarly,
         ) == "gnarly"
     )
 
@@ -708,6 +719,10 @@ def generate_with_freshness(
     mix: str = "intermediate_mix",
     bugs_per_round: int = 10,
     adaptation_enabled: bool = False,
+    cluster_misses: int = 0,
+    miss_threshold: int = 2,
+    max_delayed_gnarly: int = 1,
+    adaptation_cluster: str = "isolation",
     generate_fn: GenerateFn | None = None,
     generate_raw_fn: RawGenerateFn | None = None,
     fallback_fn: FallbackFn,
@@ -734,6 +749,10 @@ def generate_with_freshness(
         mix=mix,
         bugs_per_round=bugs_per_round,
         adaptation_enabled=adaptation_enabled,
+        cluster_misses=cluster_misses,
+        miss_threshold=miss_threshold,
+        max_delayed_gnarly=max_delayed_gnarly,
+        adaptation_cluster=adaptation_cluster,
     )
     used_seed_ids.add(seed.seed_id)
     avoid = build_avoid_list(history, max_items=avoid_list_max)

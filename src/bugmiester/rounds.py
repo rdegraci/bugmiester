@@ -7,7 +7,14 @@ import uuid
 from collections import deque
 from dataclasses import dataclass, field
 
-from bugmiester.adaptation import ADAPTIVE_ACTION_NONE, cluster_for_category
+from bugmiester.adaptation import (
+    ADAPTIVE_ACTION_NONE,
+    AnsweredBug,
+    adaptive_action_for_pick,
+    cluster_for_category,
+    compute_gnarly_delay,
+    count_cluster_misses,
+)
 from bugmiester.config import Settings
 from bugmiester.freshness import (
     SEED_POOL,
@@ -150,6 +157,9 @@ class RoundState:
     seed_pool: tuple[ScenarioSeed, ...] = field(default_factory=tuple)
     seed_mix: str = "senior_mix"
     adaptation_enabled: bool = False
+    adaptation_cluster: str = "isolation"
+    adaptation_miss_threshold: int = 2
+    adaptation_max_delayed_gnarly: int = 1
     complete: bool = False
 
 
@@ -158,6 +168,76 @@ class RoundStore:
         self._rounds: dict[str, RoundState] = {}
         self._history: deque[HistoryEntry] = deque(maxlen=history_maxlen)
         self.metrics = MetricsCollector()
+
+    def _answered_bugs(self, state: RoundState) -> list[AnsweredBug]:
+        return [
+            AnsweredBug(
+                index=snippet.index,
+                bug_category=snippet.bug_category,
+                answered=snippet.answered,
+                correct=snippet.correct,
+                partial=snippet.partial,
+                recovery_open=snippet.recovery_open,
+                player_answer=snippet.player_answer,
+            )
+            for snippet in state.snippets.values()
+        ]
+
+    def _adaptation_kw(self, state: RoundState) -> dict[str, object]:
+        if not state.adaptation_enabled:
+            return {"adaptation_enabled": False}
+        misses = count_cluster_misses(
+            self._answered_bugs(state),
+            state.adaptation_cluster,
+            state.bugs_per_round,
+        )
+        return {
+            "adaptation_enabled": True,
+            "cluster_misses": misses,
+            "miss_threshold": state.adaptation_miss_threshold,
+            "max_delayed_gnarly": state.adaptation_max_delayed_gnarly,
+            "adaptation_cluster": state.adaptation_cluster,
+        }
+
+    def _difficulty_label(self, state: RoundState, index: int) -> str:
+        kw = self._adaptation_kw(state)
+        return difficulty_label(
+            state.seed_mix,
+            index,
+            state.bugs_per_round,
+            adaptation_enabled=bool(kw.get("adaptation_enabled")),
+            cluster_misses=int(kw.get("cluster_misses", 0)),
+            miss_threshold=int(kw.get("miss_threshold", 2)),
+            max_delayed_gnarly=int(kw.get("max_delayed_gnarly", 1)),
+        )
+
+    def _adaptive_action_for_pick(
+        self, state: RoundState, *, used_count: int | None = None
+    ) -> str:
+        kw = self._adaptation_kw(state)
+        if not kw.get("adaptation_enabled"):
+            return ADAPTIVE_ACTION_NONE
+        from bugmiester.mix import adaptive_phase
+
+        used = used_count if used_count is not None else len(state.used_seed_ids)
+        delay = compute_gnarly_delay(
+            int(kw["cluster_misses"]),
+            int(kw["miss_threshold"]),
+            int(kw["max_delayed_gnarly"]),
+            state.bugs_per_round,
+        )
+        phase = adaptive_phase(
+            used,
+            state.bugs_per_round,
+            mix=state.seed_mix,
+            adaptation_enabled=True,
+            cluster_misses=int(kw["cluster_misses"]),
+            miss_threshold=int(kw["miss_threshold"]),
+            max_delayed_gnarly=int(kw["max_delayed_gnarly"]),
+        )
+        return adaptive_action_for_pick(
+            used, state.bugs_per_round, phase, delay
+        )
 
     def start(self, settings: Settings) -> RoundStartResponse:
         round_id = str(uuid.uuid4())
@@ -180,6 +260,9 @@ class RoundStore:
             ),
             seed_mix=settings.game.mix,
             adaptation_enabled=settings.adaptation.enabled,
+            adaptation_cluster=settings.adaptation.cluster,
+            adaptation_miss_threshold=settings.adaptation.miss_threshold,
+            adaptation_max_delayed_gnarly=settings.adaptation.max_delayed_gnarly,
         )
         self._rounds[round_id] = state
         if settings.metrics.log_per_bug:
@@ -217,6 +300,9 @@ class RoundStore:
 
         _assert_provider_ready(settings)
 
+        adapt_kw = self._adaptation_kw(state)
+        pick_used = len(state.used_seed_ids)
+        adaptive_action = self._adaptive_action_for_pick(state, used_count=pick_used)
         started = time.perf_counter()
         try:
             outcome = generate_bug(
@@ -226,6 +312,7 @@ class RoundStore:
                 seed_pool=state.seed_pool or SEED_POOL,
                 mix=state.seed_mix,
                 bugs_per_round=state.bugs_per_round,
+                adaptation_cluster_misses=int(adapt_kw.get("cluster_misses", 0)),
             )
         except Exception as exc:
             mapped = _map_provider_error(exc)
@@ -259,7 +346,7 @@ class RoundStore:
                 model=settings.llm.model,
                 bug_category=stored.bug_category,
                 cluster=cluster_for_category(stored.bug_category),
-                adaptive_action=ADAPTIVE_ACTION_NONE,
+                adaptive_action=adaptive_action,
             )
         return NextBugResponse(
             round_id=round_id,
@@ -271,12 +358,7 @@ class RoundStore:
             difficulty=stored.difficulty,
             degraded=stored.degraded,
             mix=state.seed_mix,
-            difficulty_label=difficulty_label(
-                state.seed_mix,
-                stored.index,
-                state.bugs_per_round,
-                adaptation_enabled=state.adaptation_enabled,
-            ),
+            difficulty_label=self._difficulty_label(state, stored.index),
         )
 
     def resume(
@@ -351,12 +433,7 @@ class RoundStore:
             code=target.code,
             difficulty=target.difficulty,
             mix=state.seed_mix,
-            difficulty_label=difficulty_label(
-                state.seed_mix,
-                target.index,
-                state.bugs_per_round,
-                adaptation_enabled=state.adaptation_enabled,
-            ),
+            difficulty_label=self._difficulty_label(state, target.index),
             degraded=target.degraded,
             answered=answered,
             player_answer=target.player_answer if answered else "",
@@ -390,12 +467,7 @@ class RoundStore:
             difficulty=stored.difficulty,
             degraded=stored.degraded,
             mix=state.seed_mix,
-            difficulty_label=difficulty_label(
-                state.seed_mix,
-                stored.index,
-                state.bugs_per_round,
-                adaptation_enabled=state.adaptation_enabled,
-            ),
+            difficulty_label=self._difficulty_label(state, stored.index),
         )
 
     def _store_generated(

@@ -62,11 +62,11 @@ Each phase is intended as **one reviewable commit** (merge or split as needed).
 
 ### Phase 2 — Within-round adaptation (MVP)
 
-- Count isolation-cluster **misses** in the Common window (after slop, before reserved gnarly slots)
-- If `misses >= miss_threshold` → delay gnarly up to `max_delayed_gnarly` slots
-- Reinforcement picks Common isolation seeds (not `is_gnarly_seed()`)
-- Set `adaptive_action` to `reinforce` or `delayed_gnarly` on affected bugs
-- Unit tests: threshold, cap, strong-player no-op
+- [x] Count isolation-cluster **misses** in the Common window (after slop, before reserved gnarly slots)
+- [x] If `misses >= miss_threshold` → delay gnarly up to `max_delayed_gnarly` slots
+- [x] Reinforcement picks Common isolation seeds (not `is_gnarly_seed()`)
+- [x] Set `adaptive_action` to `reinforce` on reinforcement slots
+- [x] Unit tests for threshold, cap, strong-player no-op; integration test with mocked miss count
 
 **Exit:** Playable; Gnarly still appears every senior round.
 

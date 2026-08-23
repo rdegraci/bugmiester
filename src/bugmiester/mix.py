@@ -127,20 +127,37 @@ def adaptive_phase(
     *,
     mix: str = DEFAULT_MIX,
     adaptation_enabled: bool = False,
+    cluster_misses: int = 0,
+    miss_threshold: int = 2,
+    max_delayed_gnarly: int = 1,
 ) -> str:
     """
     Return the mix band for the next bug at ``used_count`` (0-based index).
 
     Bands: ``slop`` | ``senior`` | ``gnarly`` (same names as ``senior_phase``).
 
-    Phase 1: when ``adaptation_enabled`` is false, or mix is not ``senior_mix``,
-    this matches ``senior_phase`` exactly. Phase 2 will delay gnarly based on
-    Common-band misses in the active cluster.
+    When adaptation is enabled on ``senior_mix``, Common-band cluster misses can
+    postpone up to ``max_delayed_gnarly`` Gnarly slots (keeping at least one).
     """
     if not adaptation_enabled or normalize_mix(mix) != "senior_mix":
         return senior_phase(used_count, bugs_per_round)
-    # Phase 2: performance-aware scheduling before returning index-only fallback.
-    return senior_phase(used_count, bugs_per_round)
+
+    from bugmiester.adaptation import compute_gnarly_delay
+
+    delay = compute_gnarly_delay(
+        cluster_misses,
+        miss_threshold,
+        max_delayed_gnarly,
+        bugs_per_round,
+    )
+    slop = slop_quota(bugs_per_round)
+    gnarly = gnarly_quota(bugs_per_round)
+    effective_gnarly = gnarly - delay if delay > 0 else gnarly
+    if used_count < slop:
+        return "slop"
+    if effective_gnarly > 0 and used_count >= bugs_per_round - effective_gnarly:
+        return "gnarly"
+    return "senior"
 
 
 def is_gnarly_seed(seed: object) -> bool:
@@ -158,6 +175,9 @@ def difficulty_label(
     bugs_per_round: int,
     *,
     adaptation_enabled: bool = False,
+    cluster_misses: int = 0,
+    miss_threshold: int = 2,
+    max_delayed_gnarly: int = 1,
 ) -> str:
     """Player-facing band for the current bug, or empty when the mix does not ramp."""
     if normalize_mix(mix) != "senior_mix":
@@ -167,6 +187,9 @@ def difficulty_label(
         bugs_per_round,
         mix=str(mix),
         adaptation_enabled=adaptation_enabled,
+        cluster_misses=cluster_misses,
+        miss_threshold=miss_threshold,
+        max_delayed_gnarly=max_delayed_gnarly,
     )
     return BAND_LABELS[phase]
 
@@ -177,6 +200,10 @@ def preferred_categories(
     *,
     bugs_per_round: int,
     adaptation_enabled: bool = False,
+    cluster_misses: int = 0,
+    miss_threshold: int = 2,
+    max_delayed_gnarly: int = 1,
+    adaptation_cluster: str = "isolation",
 ) -> frozenset[str] | None:
     """
     Category set to try first, or None for an unweighted (intermediate) draw.
@@ -194,9 +221,31 @@ def preferred_categories(
         bugs_per_round,
         mix=profile,
         adaptation_enabled=adaptation_enabled,
+        cluster_misses=cluster_misses,
+        miss_threshold=miss_threshold,
+        max_delayed_gnarly=max_delayed_gnarly,
     )
     if phase == "slop":
         return SLOP_MIX_CATEGORIES
     if phase == "gnarly":
         return GNARLY_CATEGORIES
+
+    from bugmiester.adaptation import (
+        cluster_category_set,
+        compute_gnarly_delay,
+        is_reinforcement_slot,
+    )
+
+    delay = 0
+    if adaptation_enabled and profile == "senior_mix":
+        delay = compute_gnarly_delay(
+            cluster_misses,
+            miss_threshold,
+            max_delayed_gnarly,
+            bugs_per_round,
+        )
+    if is_reinforcement_slot(len(used_seeds), bugs_per_round, delay):
+        reinforce = cluster_category_set(adaptation_cluster) & SENIOR_CORE_CATEGORIES
+        if reinforce:
+            return reinforce
     return SENIOR_CORE_CATEGORIES

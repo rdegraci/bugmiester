@@ -117,6 +117,7 @@ def generate_bug(
     seed_pool: Sequence[ScenarioSeed] = SEED_POOL,
     mix: str | None = None,
     bugs_per_round: int | None = None,
+    adaptation_cluster_misses: int = 0,
 ) -> GenerateBugResult:
     """
     Generate one validated snippet.
@@ -160,6 +161,10 @@ def generate_bug(
             else settings.game.bugs_per_round
         ),
         adaptation_enabled=settings.adaptation.enabled,
+        cluster_misses=adaptation_cluster_misses if settings.adaptation.enabled else 0,
+        miss_threshold=settings.adaptation.miss_threshold,
+        max_delayed_gnarly=settings.adaptation.max_delayed_gnarly,
+        adaptation_cluster=settings.adaptation.cluster,
         generate_raw_fn=generate_raw_fn,
         parse_raw=parse_raw,
         fallback_fn=fallback_for_seed,
