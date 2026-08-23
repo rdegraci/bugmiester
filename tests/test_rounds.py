@@ -27,6 +27,7 @@ def _mock_settings(tmp_path: Path, monkeypatch):
     ensure_app_dir(app_dir=app_dir, examples_dir=examples)
     raw = yaml.safe_load((app_dir / "config.yaml").read_text(encoding="utf-8"))
     raw["llm"]["provider"] = "mock"
+    raw["adaptation"] = {"enabled": False}
     (app_dir / "config.yaml").write_text(
         yaml.safe_dump(raw, sort_keys=False), encoding="utf-8"
     )
@@ -38,6 +39,7 @@ def _mock_settings(tmp_path: Path, monkeypatch):
 
 def test_full_mock_round_no_answer_key_leak(tmp_path: Path, monkeypatch) -> None:
     settings = _mock_settings(tmp_path, monkeypatch)
+    assert settings.adaptation.enabled is False
     app = create_app(settings=settings)
 
     with TestClient(app) as client:

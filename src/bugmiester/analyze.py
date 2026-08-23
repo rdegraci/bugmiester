@@ -8,6 +8,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from bugmiester.adaptation import (
+    ADAPTIVE_ACTION_REINFORCE,
+    is_common_window_index,
+)
 from bugmiester.reports import REPORT_REASONS, list_reports
 
 
@@ -18,6 +22,7 @@ DEGRADED_RATE_ALERT = 0.2
 AVG_GENERATE_ATTEMPTS_ALERT = 1.5
 FRESHNESS_REJECT_RATE_ALERT = 0.3  # share of bugs with ≥1 reject (last N)
 JUDGE_CALL_RATE_ALERT = 0.85
+ADAPTATION_REINFORCE_ROUND_RATE_ALERT = 0.5
 LAST_BUGS_WINDOW = 20
 TOP_N = 5
 
@@ -64,12 +69,64 @@ def _bug_entries(round_logs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return bugs
 
 
+def _adaptation_summary(round_logs: list[dict[str, Any]]) -> dict[str, Any]:
+    reinforce_actions = 0
+    rounds_with_reinforce = 0
+    isolation_scored = 0
+    isolation_misses = 0
+
+    for round_log in round_logs:
+        bugs_per_round = int(round_log.get("bugs_per_round") or 10)
+        round_reinforce = False
+        for bug in round_log.get("bugs") or []:
+            if not isinstance(bug, dict):
+                continue
+            action = str(bug.get("adaptive_action") or "")
+            if action == ADAPTIVE_ACTION_REINFORCE:
+                reinforce_actions += 1
+                round_reinforce = True
+            cluster = str(bug.get("cluster") or "")
+            index = bug.get("index")
+            if cluster != "isolation" or index is None:
+                continue
+            try:
+                bug_index = int(index)
+            except (TypeError, ValueError):
+                continue
+            if not is_common_window_index(bug_index, bugs_per_round):
+                continue
+            if bug.get("correct") is None:
+                continue
+            isolation_scored += 1
+            if not bool(bug.get("correct")):
+                isolation_misses += 1
+        if round_reinforce:
+            rounds_with_reinforce += 1
+
+    round_count = len(round_logs)
+    reinforce_round_rate = (
+        round(rounds_with_reinforce / round_count, 4) if round_count else 0.0
+    )
+    isolation_miss_rate = (
+        round(isolation_misses / isolation_scored, 4) if isolation_scored else 0.0
+    )
+    return {
+        "reinforce_actions": reinforce_actions,
+        "rounds_with_reinforce": rounds_with_reinforce,
+        "reinforce_round_rate": reinforce_round_rate,
+        "isolation_common_scored": isolation_scored,
+        "isolation_common_misses": isolation_misses,
+        "isolation_common_miss_rate": isolation_miss_rate,
+    }
+
+
 def _build_alerts(
     *,
     report_count: int,
     round_log_count: int,
     metrics: dict[str, float],
     recent_bugs: list[dict[str, Any]],
+    adaptation: dict[str, Any] | None = None,
 ) -> list[str]:
     alerts: list[str] = []
     if report_count == 0 and round_log_count == 0:
@@ -102,6 +159,13 @@ def _build_alerts(
             f"High judge call rate ({metrics['judge_call_rate']:.0%}) — "
             "keyword path may be too weak"
         )
+    if adaptation:
+        reinforce_rate = float(adaptation.get("reinforce_round_rate") or 0)
+        if round_log_count and reinforce_rate >= ADAPTATION_REINFORCE_ROUND_RATE_ALERT:
+            alerts.append(
+                f"High adaptation reinforce rate ({reinforce_rate:.0%}) — "
+                "players may be missing isolation often or threshold is too low"
+            )
     return alerts
 
 
@@ -180,12 +244,15 @@ def analyze(
         for name, count in seed_counts.most_common(TOP_N)
     ]
 
+    adaptation = _adaptation_summary(round_logs)
+
     summary: dict[str, Any] = {
         "generated_at": _utc_now_iso(),
         "report_count": len(reports),
         "round_log_count": len(round_logs),
         "reasons": reasons,
         "metrics": metrics,
+        "adaptation": adaptation,
         "top_categories": top_categories,
         "top_seeds": top_seeds,
         "alerts": _build_alerts(
@@ -193,6 +260,7 @@ def analyze(
             round_log_count=len(round_logs),
             metrics=metrics,
             recent_bugs=bugs,
+            adaptation=adaptation,
         ),
     }
 

@@ -37,6 +37,10 @@ CLUSTER_CATEGORIES: dict[str, frozenset[str]] = {
     "isolation": ISOLATION_CLUSTER_CATEGORIES,
 }
 
+ADAPTATION_CLUSTER_HINTS: dict[str, str] = {
+    "isolation": "Extra practice on isolation before Gnarly.",
+}
+
 
 @dataclass(frozen=True)
 class AnsweredBug:
@@ -68,6 +72,15 @@ def cluster_for_category(category: str) -> str | None:
         if cat in categories:
             return cluster_id
     return None
+
+
+def adaptation_hint_for_action(action: str, cluster: str) -> str:
+    """Player-facing coach line when adaptation schedules reinforcement."""
+    if action != ADAPTIVE_ACTION_REINFORCE:
+        return ""
+    return ADAPTATION_CLUSTER_HINTS.get(
+        normalize_adaptive_cluster(cluster), ""
+    )
 
 
 def cluster_category_set(cluster: str) -> frozenset[str]:

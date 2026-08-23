@@ -8,7 +8,10 @@ from pathlib import Path
 import yaml
 from fastapi.testclient import TestClient
 
-from bugmiester.adaptation import ADAPTIVE_ACTION_REINFORCE
+from bugmiester.adaptation import (
+    ADAPTIVE_ACTION_REINFORCE,
+    adaptation_hint_for_action,
+)
 from bugmiester.app import create_app
 from bugmiester.config import ensure_app_dir, load_settings
 from bugmiester.freshness import SEED_POOL
@@ -100,6 +103,9 @@ def test_adapted_round_delays_gnarly_after_isolation_misses(
         # Indices 8–9: with 2+ Common isolation misses, slot 8 stays Common.
         assert bugs[8]["difficulty_label"] == "Common"
         assert bugs[9]["difficulty_label"] == "Gnarly"
+        assert bugs[8]["adaptation_hint"] == adaptation_hint_for_action(
+            ADAPTIVE_ACTION_REINFORCE, "isolation"
+        )
 
         log_path = settings.logs_dir / f"round_{round_id}.json"
         payload = json.loads(log_path.read_text(encoding="utf-8"))

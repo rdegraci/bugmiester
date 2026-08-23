@@ -176,7 +176,7 @@ def test_load_settings_adaptation_defaults(tmp_path: Path) -> None:
         load_env_into_process=False,
     )
 
-    assert settings.adaptation.enabled is False
+    assert settings.adaptation.enabled is True
     assert settings.adaptation.cluster == "isolation"
     assert settings.adaptation.miss_threshold == 2
     assert settings.adaptation.max_delayed_gnarly == 1

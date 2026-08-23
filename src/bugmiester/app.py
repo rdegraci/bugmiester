@@ -46,6 +46,7 @@ def health_payload(settings: Settings) -> dict:
         "message": message,
         "prefetch_next_bug": bool(settings.resilience.prefetch_next_bug),
         "mix": settings.game.mix,
+        "adaptation_enabled": bool(settings.adaptation.enabled),
     }
 
 

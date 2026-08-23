@@ -8,6 +8,8 @@
     kpiDegraded: document.getElementById("kpi-degraded"),
     kpiGenerate: document.getElementById("kpi-generate"),
     kpiJudge: document.getElementById("kpi-judge"),
+    kpiReinforce: document.getElementById("kpi-reinforce"),
+    kpiIsolationMiss: document.getElementById("kpi-isolation-miss"),
     reasonsBody: document.getElementById("reasons-body"),
     alertsList: document.getElementById("alerts-list"),
     reportsBody: document.getElementById("reports-body"),
@@ -72,6 +74,15 @@
     els.kpiDegraded.textContent = pct(metrics.degraded_rate);
     els.kpiGenerate.textContent = ms(metrics.avg_generate_ms);
     els.kpiJudge.textContent = pct(metrics.judge_call_rate);
+    const adaptation = (summary && summary.adaptation) || {};
+    if (els.kpiReinforce) {
+      els.kpiReinforce.textContent = pct(adaptation.reinforce_round_rate);
+    }
+    if (els.kpiIsolationMiss) {
+      els.kpiIsolationMiss.textContent = pct(
+        adaptation.isolation_common_miss_rate
+      );
+    }
 
     clearChildren(els.reasonsBody);
     const reasons = (summary && summary.reasons) || {};

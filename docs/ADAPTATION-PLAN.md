@@ -72,9 +72,9 @@ Each phase is intended as **one reviewable commit** (merge or split as needed).
 
 ### Phase 3 — Observability + player clarity
 
-- UI banner when reinforcement / delay fires
-- Ops / `analyze`: counts of adaptive actions and cluster miss rate
-- Tune defaults; flip `adaptation.enabled: true` if metrics look sane
+- [x] UI banner when reinforcement fires (`adaptation_hint` on bug responses)
+- [x] Ops / `analyze`: `adaptation` block (reinforce rate, isolation Common miss rate)
+- [x] Default `adaptation.enabled: true` in config + example
 
 **Exit:** Maintainable; players understand the coach line.
 
@@ -90,7 +90,7 @@ Each phase is intended as **one reviewable commit** (merge or split as needed).
 
 ```yaml
 adaptation:
-  enabled: false              # Phase 1 default; flip in Phase 3
+  enabled: true               # Phase 3 default; set false to disable scheduling
   cluster: isolation            # v1 cluster id
   miss_threshold: 2             # Common-band misses before delay (Phase 2)
   max_delayed_gnarly: 1         # cap delayed gnarly slots per round (Phase 2)

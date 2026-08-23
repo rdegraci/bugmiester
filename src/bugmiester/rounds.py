@@ -11,6 +11,7 @@ from bugmiester.adaptation import (
     ADAPTIVE_ACTION_NONE,
     AnsweredBug,
     adaptive_action_for_pick,
+    adaptation_hint_for_action,
     cluster_for_category,
     compute_gnarly_delay,
     count_cluster_misses,
@@ -138,6 +139,7 @@ class StoredSnippet:
     recovery_open: bool = False
     recovery_options: tuple[RecoveryOption, ...] = ()
     feedback: str = ""
+    adaptive_action: str = ADAPTIVE_ACTION_NONE
 
 
 @dataclass
@@ -239,6 +241,11 @@ class RoundStore:
             used, state.bugs_per_round, phase, delay
         )
 
+    def _adaptation_hint(self, state: RoundState, stored: StoredSnippet) -> str:
+        return adaptation_hint_for_action(
+            stored.adaptive_action, state.adaptation_cluster
+        )
+
     def start(self, settings: Settings) -> RoundStartResponse:
         round_id = str(uuid.uuid4())
         bugs = settings.game.bugs_per_round
@@ -331,6 +338,7 @@ class RoundStore:
             degraded=degraded,
             attempts=attempts,
             rejects=rejects,
+            adaptive_action=adaptive_action,
         )
         if settings.metrics.log_per_bug:
             self.metrics.record_generate(
@@ -359,6 +367,7 @@ class RoundStore:
             degraded=stored.degraded,
             mix=state.seed_mix,
             difficulty_label=self._difficulty_label(state, stored.index),
+            adaptation_hint=self._adaptation_hint(state, stored),
         )
 
     def resume(
@@ -434,6 +443,7 @@ class RoundStore:
             difficulty=target.difficulty,
             mix=state.seed_mix,
             difficulty_label=self._difficulty_label(state, target.index),
+            adaptation_hint=self._adaptation_hint(state, target),
             degraded=target.degraded,
             answered=answered,
             player_answer=target.player_answer if answered else "",
@@ -468,6 +478,7 @@ class RoundStore:
             degraded=stored.degraded,
             mix=state.seed_mix,
             difficulty_label=self._difficulty_label(state, stored.index),
+            adaptation_hint=self._adaptation_hint(state, stored),
         )
 
     def _store_generated(
@@ -478,6 +489,7 @@ class RoundStore:
         degraded: bool,
         attempts: int,
         rejects: int,
+        adaptive_action: str = ADAPTIVE_ACTION_NONE,
     ) -> StoredSnippet:
         snippet_id = str(uuid.uuid4())
         stored = StoredSnippet(
@@ -494,6 +506,7 @@ class RoundStore:
             seed_id=generated.seed.seed_id,
             generate_attempts=attempts,
             freshness_rejects=rejects,
+            adaptive_action=adaptive_action,
         )
         state.pending = stored
         state.snippets[snippet_id] = stored

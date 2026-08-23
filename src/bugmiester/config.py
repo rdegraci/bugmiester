@@ -101,7 +101,7 @@ class ReportsSettings:
 
 @dataclass(frozen=True)
 class AdaptationSettings:
-    enabled: bool = False
+    enabled: bool = True
     cluster: str = "isolation"
     miss_threshold: int = 2
     max_delayed_gnarly: int = 1
@@ -264,7 +264,7 @@ def _parse_yaml_config(raw: Mapping[str, Any]) -> dict[str, Any]:
             dir_name=str(reports_raw.get("dir_name", DEFAULT_REPORTS_DIR)),
         ),
         "adaptation": AdaptationSettings(
-            enabled=bool(adaptation_raw.get("enabled", False)),
+            enabled=bool(adaptation_raw.get("enabled", True)),
             cluster=normalize_adaptive_cluster(adaptation_raw.get("cluster")),
             miss_threshold=_clamp_int(
                 adaptation_raw.get("miss_threshold", 2),

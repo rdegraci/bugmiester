@@ -7,6 +7,7 @@ from bugmiester.adaptation import (
     ADAPTIVE_ACTION_REINFORCE,
     AnsweredBug,
     adaptive_action_for_pick,
+    adaptation_hint_for_action,
     cluster_for_category,
     compute_gnarly_delay,
     count_cluster_misses,
@@ -208,5 +209,8 @@ def test_is_common_window_index() -> None:
     assert not is_common_window_index(9, 10)
 
 
-def test_adaptive_action_none_constant() -> None:
-    assert ADAPTIVE_ACTION_NONE == "none"
+def test_adaptation_hint_for_reinforce() -> None:
+    assert adaptation_hint_for_action(ADAPTIVE_ACTION_REINFORCE, "isolation") == (
+        "Extra practice on isolation before Gnarly."
+    )
+    assert adaptation_hint_for_action("none", "isolation") == ""

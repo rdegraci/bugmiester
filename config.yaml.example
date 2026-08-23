@@ -58,7 +58,7 @@ feedback:
   # Post-MVP: suggestion_llm: true, auto_apply_seed_weights: false
 
 adaptation:
-  enabled: false                 # Phase 2+: reinforce isolation before Gnarly
+  enabled: true                  # Phase 2+: reinforce isolation before Gnarly
   cluster: isolation             # v1 concept cluster
   miss_threshold: 2              # Common-band misses before delaying Gnarly
   max_delayed_gnarly: 1          # cap delayed gnarly slots per round

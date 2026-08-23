@@ -35,6 +35,7 @@ class NextBugResponse(BaseModel):
     degraded: bool = False
     mix: str = "senior_mix"
     difficulty_label: str = ""
+    adaptation_hint: str = ""
 
 
 class SubmitRequest(BaseModel):
@@ -107,6 +108,7 @@ class RoundResumeResponse(BaseModel):
     difficulty: str = ""
     mix: str = "senior_mix"
     difficulty_label: str = ""
+    adaptation_hint: str = ""
     degraded: bool = False
     answered: bool = False
     player_answer: str = ""

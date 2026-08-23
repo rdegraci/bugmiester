@@ -4,6 +4,8 @@
   const els = {
     setupBanner: document.getElementById("setup-banner"),
     setupBannerMessage: document.getElementById("setup-banner-message"),
+    adaptationBanner: document.getElementById("adaptation-banner"),
+    adaptationBannerMessage: document.getElementById("adaptation-banner-message"),
     bugIndex: document.getElementById("bug-index"),
     bugsPerRound: document.getElementById("bugs-per-round"),
     roundScore: document.getElementById("round-score"),
@@ -346,6 +348,21 @@
     return "Common";
   }
 
+  function setAdaptationHint(hint) {
+    const text = (hint || "").trim();
+    if (!els.adaptationBanner) {
+      return;
+    }
+    if (!text) {
+      setHidden(els.adaptationBanner, true);
+      return;
+    }
+    if (els.adaptationBannerMessage) {
+      els.adaptationBannerMessage.textContent = text;
+    }
+    setHidden(els.adaptationBanner, false);
+  }
+
   function updateDifficultyChrome(data) {
     if (typeof data.mix === "string" && data.mix) {
       state.mix = data.mix;
@@ -367,6 +384,9 @@
         "is-current",
         parts[i].getAttribute("data-band") === label
       );
+    }
+    if (typeof data.adaptation_hint === "string") {
+      setAdaptationHint(data.adaptation_hint);
     }
   }
 
@@ -505,6 +525,7 @@
     state.reportedCurrent = false;
     setHidden(els.reportControls, true);
     hideRecovery();
+    setAdaptationHint("");
   }
 
   function hideRecovery() {

@@ -88,6 +88,9 @@ def test_analyze_aggregates_fixture_reports_and_logs(tmp_path: Path) -> None:
         degraded=False,
         provider="mock",
         model="m",
+        bug_category="optionals",
+        cluster=None,
+        adaptive_action="none",
     )
     collector.record_submit(
         "r1",
@@ -113,7 +116,64 @@ def test_analyze_aggregates_fixture_reports_and_logs(tmp_path: Path) -> None:
     assert summary["top_categories"]
     assert summary["top_seeds"]
     assert isinstance(summary["alerts"], list)
+    assert summary["adaptation"]["reinforce_actions"] == 0
+    assert summary["adaptation"]["isolation_common_miss_rate"] == 0.0
     assert (logs / ANALYZE_LATEST_NAME).is_file()
+
+
+def test_analyze_adaptation_metrics_from_logs(tmp_path: Path) -> None:
+    reports = tmp_path / "reports"
+    logs = tmp_path / "logs"
+    reports.mkdir()
+    logs.mkdir()
+
+    payload = {
+        "round_id": "r-adapt",
+        "bugs_per_round": 10,
+        "provider": "mock",
+        "model": "m",
+        "bugs": [
+            {
+                "snippet_id": "s1",
+                "index": 3,
+                "seed_id": "conc-await-miss",
+                "cluster": "isolation",
+                "adaptive_action": "none",
+                "correct": False,
+                "partial": False,
+            },
+            {
+                "snippet_id": "s2",
+                "index": 4,
+                "seed_id": "conc-actor-mut",
+                "cluster": "isolation",
+                "adaptive_action": "none",
+                "correct": False,
+                "partial": False,
+            },
+            {
+                "snippet_id": "s3",
+                "index": 8,
+                "seed_id": "conc-nontask-async",
+                "cluster": "isolation",
+                "adaptive_action": "reinforce",
+                "correct": True,
+                "partial": False,
+            },
+        ],
+    }
+    (logs / "round_r-adapt.json").write_text(
+        json.dumps(payload, indent=2) + "\n", encoding="utf-8"
+    )
+
+    summary = analyze(reports, logs, persist=False)
+    adapt = summary["adaptation"]
+    assert adapt["reinforce_actions"] == 1
+    assert adapt["rounds_with_reinforce"] == 1
+    assert adapt["reinforce_round_rate"] == 1.0
+    assert adapt["isolation_common_scored"] == 2
+    assert adapt["isolation_common_misses"] == 2
+    assert adapt["isolation_common_miss_rate"] == 1.0
 
 
 def test_ops_api_and_cli_after_mock_round(
