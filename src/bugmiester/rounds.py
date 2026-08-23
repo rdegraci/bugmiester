@@ -7,6 +7,7 @@ import uuid
 from collections import deque
 from dataclasses import dataclass, field
 
+from bugmiester.adaptation import ADAPTIVE_ACTION_NONE, cluster_for_category
 from bugmiester.config import Settings
 from bugmiester.freshness import (
     SEED_POOL,
@@ -148,6 +149,7 @@ class RoundState:
     used_seed_ids: set[str] = field(default_factory=set)
     seed_pool: tuple[ScenarioSeed, ...] = field(default_factory=tuple)
     seed_mix: str = "senior_mix"
+    adaptation_enabled: bool = False
     complete: bool = False
 
 
@@ -177,6 +179,7 @@ class RoundStore:
                 recent_seed_ids=recent_ids,
             ),
             seed_mix=settings.game.mix,
+            adaptation_enabled=settings.adaptation.enabled,
         )
         self._rounds[round_id] = state
         if settings.metrics.log_per_bug:
@@ -254,6 +257,9 @@ class RoundStore:
                 degraded=degraded,
                 provider=settings.llm.provider,
                 model=settings.llm.model,
+                bug_category=stored.bug_category,
+                cluster=cluster_for_category(stored.bug_category),
+                adaptive_action=ADAPTIVE_ACTION_NONE,
             )
         return NextBugResponse(
             round_id=round_id,
@@ -266,7 +272,10 @@ class RoundStore:
             degraded=stored.degraded,
             mix=state.seed_mix,
             difficulty_label=difficulty_label(
-                state.seed_mix, stored.index, state.bugs_per_round
+                state.seed_mix,
+                stored.index,
+                state.bugs_per_round,
+                adaptation_enabled=state.adaptation_enabled,
             ),
         )
 
@@ -343,7 +352,10 @@ class RoundStore:
             difficulty=target.difficulty,
             mix=state.seed_mix,
             difficulty_label=difficulty_label(
-                state.seed_mix, target.index, state.bugs_per_round
+                state.seed_mix,
+                target.index,
+                state.bugs_per_round,
+                adaptation_enabled=state.adaptation_enabled,
             ),
             degraded=target.degraded,
             answered=answered,
@@ -379,7 +391,10 @@ class RoundStore:
             degraded=stored.degraded,
             mix=state.seed_mix,
             difficulty_label=difficulty_label(
-                state.seed_mix, stored.index, state.bugs_per_round
+                state.seed_mix,
+                stored.index,
+                state.bugs_per_round,
+                adaptation_enabled=state.adaptation_enabled,
             ),
         )
 

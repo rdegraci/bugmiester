@@ -60,6 +60,9 @@ def test_metrics_flush_writes_round_log(tmp_path: Path) -> None:
         degraded=False,
         provider="mock",
         model="fixture",
+        bug_category="optionals",
+        cluster=None,
+        adaptive_action="none",
     )
     collector.record_submit(
         "r1",
@@ -87,6 +90,9 @@ def test_metrics_flush_writes_round_log(tmp_path: Path) -> None:
     assert bug["degraded"] is False
     assert bug["generate_ms"] == 12.5
     assert bug["submit_ms"] == 3.0
+    assert bug["bug_category"] == "optionals"
+    assert bug["cluster"] is None
+    assert bug["adaptive_action"] == "none"
 
 
 def test_write_report_creates_json(tmp_path: Path) -> None:
@@ -191,6 +197,9 @@ def test_full_mock_round_writes_log_and_report(
             assert "freshness_rejects" in bug
             assert "judge_called" in bug
             assert "degraded" in bug
+            assert "bug_category" in bug
+            assert "cluster" in bug
+            assert "adaptive_action" in bug
             assert bug["provider"] == "mock"
             assert bug["model"]
 

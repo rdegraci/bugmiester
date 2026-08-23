@@ -164,6 +164,56 @@ def test_load_settings_mock_always_ready(tmp_path: Path) -> None:
     assert settings.freshness.recent_seed_rounds == 3
 
 
+def test_load_settings_adaptation_defaults(tmp_path: Path) -> None:
+    examples = tmp_path / "examples"
+    app_dir = tmp_path / "app"
+    _write_examples(examples)
+    ensure_app_dir(app_dir=app_dir, examples_dir=examples)
+
+    settings = load_settings(
+        app_dir=app_dir,
+        examples_dir=examples,
+        load_env_into_process=False,
+    )
+
+    assert settings.adaptation.enabled is False
+    assert settings.adaptation.cluster == "isolation"
+    assert settings.adaptation.miss_threshold == 2
+    assert settings.adaptation.max_delayed_gnarly == 1
+    assert settings.adaptation.cross_round is False
+
+
+def test_load_settings_adaptation_section(tmp_path: Path) -> None:
+    examples = tmp_path / "examples"
+    app_dir = tmp_path / "app"
+    _write_examples(examples)
+    ensure_app_dir(app_dir=app_dir, examples_dir=examples)
+
+    raw = yaml.safe_load((app_dir / "config.yaml").read_text(encoding="utf-8"))
+    raw["adaptation"] = {
+        "enabled": True,
+        "cluster": "isolation",
+        "miss_threshold": 3,
+        "max_delayed_gnarly": 2,
+        "cross_round": True,
+    }
+    (app_dir / "config.yaml").write_text(
+        yaml.safe_dump(raw, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    settings = load_settings(
+        app_dir=app_dir,
+        examples_dir=examples,
+        load_env_into_process=False,
+    )
+
+    assert settings.adaptation.enabled is True
+    assert settings.adaptation.miss_threshold == 3
+    assert settings.adaptation.max_delayed_gnarly == 2
+    assert settings.adaptation.cross_round is True
+
+
 def test_resolve_provider_key_helpers() -> None:
     assert resolve_provider_key("mock") == (None, None, True)
     assert resolve_provider_key(

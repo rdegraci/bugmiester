@@ -11,10 +11,10 @@ from dataclasses import dataclass
 
 from bugmiester.llm.parse import ParseError
 from bugmiester.mix import (
+    adaptive_phase,
     is_gnarly_seed,
     normalize_mix,
     preferred_categories,
-    senior_phase,
 )
 
 
@@ -620,6 +620,7 @@ def pick_seed(
     max_category_repeats: int = 1,
     mix: str = "intermediate_mix",
     bugs_per_round: int = 10,
+    adaptation_enabled: bool = False,
 ) -> ScenarioSeed:
     """
     Next unused seed, preferring categories still under the per-round cap.
@@ -644,11 +645,19 @@ def pick_seed(
         seed for seed in unused if category_counts[seed.category] < cap
     ]
     prefer = preferred_categories(
-        mix, used_seeds, bugs_per_round=bugs_per_round
+        mix,
+        used_seeds,
+        bugs_per_round=bugs_per_round,
+        adaptation_enabled=adaptation_enabled,
     )
     gnarly_only = (
         normalize_mix(mix) == "senior_mix"
-        and senior_phase(len(used_seeds), bugs_per_round) == "gnarly"
+        and adaptive_phase(
+            len(used_seeds),
+            bugs_per_round,
+            mix=mix,
+            adaptation_enabled=adaptation_enabled,
+        ) == "gnarly"
     )
 
     def _preferred(candidates: list[ScenarioSeed]) -> list[ScenarioSeed]:
@@ -698,6 +707,7 @@ def generate_with_freshness(
     max_category_repeats: int = 1,
     mix: str = "intermediate_mix",
     bugs_per_round: int = 10,
+    adaptation_enabled: bool = False,
     generate_fn: GenerateFn | None = None,
     generate_raw_fn: RawGenerateFn | None = None,
     fallback_fn: FallbackFn,
@@ -723,6 +733,7 @@ def generate_with_freshness(
         max_category_repeats=max_category_repeats,
         mix=mix,
         bugs_per_round=bugs_per_round,
+        adaptation_enabled=adaptation_enabled,
     )
     used_seed_ids.add(seed.seed_id)
     avoid = build_avoid_list(history, max_items=avoid_list_max)

@@ -57,6 +57,13 @@ feedback:
   analyze_on_ops_load: true
   # Post-MVP: suggestion_llm: true, auto_apply_seed_weights: false
 
+adaptation:
+  enabled: false                 # Phase 2+: reinforce isolation before Gnarly
+  cluster: isolation             # v1 concept cluster
+  miss_threshold: 2              # Common-band misses before delaying Gnarly
+  max_delayed_gnarly: 1          # cap delayed gnarly slots per round
+  cross_round: false             # Phase 4: weakness.json memory
+
 server:
   host: 127.0.0.1
   port: 8765

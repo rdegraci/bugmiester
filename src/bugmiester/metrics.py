@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from bugmiester.adaptation import ADAPTIVE_ACTION_NONE, ADAPTIVE_ACTIONS
+
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -26,6 +28,9 @@ class BugMetrics:
     degraded: bool = False
     provider: str = ""
     model: str = ""
+    bug_category: str = ""
+    cluster: str | None = None
+    adaptive_action: str = ADAPTIVE_ACTION_NONE
     points_awarded: int | None = None
     correct: bool | None = None
     partial: bool | None = None
@@ -88,7 +93,15 @@ class MetricsCollector:
         degraded: bool,
         provider: str,
         model: str,
+        bug_category: str = "",
+        cluster: str | None = None,
+        adaptive_action: str = ADAPTIVE_ACTION_NONE,
     ) -> BugMetrics:
+        action = (
+            adaptive_action
+            if adaptive_action in ADAPTIVE_ACTIONS
+            else ADAPTIVE_ACTION_NONE
+        )
         round_metrics = self._require(round_id)
         bug = BugMetrics(
             snippet_id=snippet_id,
@@ -100,6 +113,9 @@ class MetricsCollector:
             degraded=degraded,
             provider=provider,
             model=model,
+            bug_category=str(bug_category or "").strip(),
+            cluster=cluster,
+            adaptive_action=action,
         )
         round_metrics.bugs.append(bug)
         return bug

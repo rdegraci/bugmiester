@@ -159,6 +159,7 @@ def generate_bug(
             if bugs_per_round is not None
             else settings.game.bugs_per_round
         ),
+        adaptation_enabled=settings.adaptation.enabled,
         generate_raw_fn=generate_raw_fn,
         parse_raw=parse_raw,
         fallback_fn=fallback_for_seed,

@@ -11,6 +11,7 @@ from typing import Any, Mapping
 import yaml
 from dotenv import dotenv_values, load_dotenv
 
+from bugmiester.adaptation import normalize_adaptive_cluster
 from bugmiester.mix import DEFAULT_MIX, normalize_mix
 
 PLACEHOLDER_KEY = "replace-me"
@@ -99,6 +100,15 @@ class ReportsSettings:
 
 
 @dataclass(frozen=True)
+class AdaptationSettings:
+    enabled: bool = False
+    cluster: str = "isolation"
+    miss_threshold: int = 2
+    max_delayed_gnarly: int = 1
+    cross_round: bool = False
+
+
+@dataclass(frozen=True)
 class FeedbackSettings:
     analyze_on_ops_load: bool = True
 
@@ -124,6 +134,7 @@ class Settings:
     recovery: RecoverySettings = field(default_factory=RecoverySettings)
     metrics: MetricsSettings = field(default_factory=MetricsSettings)
     reports: ReportsSettings = field(default_factory=ReportsSettings)
+    adaptation: AdaptationSettings = field(default_factory=AdaptationSettings)
     feedback: FeedbackSettings = field(default_factory=FeedbackSettings)
     server: ServerSettings = field(default_factory=ServerSettings)
     api_key: str | None = None
@@ -170,6 +181,7 @@ def _parse_yaml_config(raw: Mapping[str, Any]) -> dict[str, Any]:
     recovery_raw = _section(raw, "recovery")
     metrics_raw = _section(raw, "metrics")
     reports_raw = _section(raw, "reports")
+    adaptation_raw = _section(raw, "adaptation")
     feedback_raw = _section(raw, "feedback")
     server_raw = _section(raw, "server")
 
@@ -250,6 +262,23 @@ def _parse_yaml_config(raw: Mapping[str, Any]) -> dict[str, Any]:
         "reports": ReportsSettings(
             enabled=bool(reports_raw.get("enabled", True)),
             dir_name=str(reports_raw.get("dir_name", DEFAULT_REPORTS_DIR)),
+        ),
+        "adaptation": AdaptationSettings(
+            enabled=bool(adaptation_raw.get("enabled", False)),
+            cluster=normalize_adaptive_cluster(adaptation_raw.get("cluster")),
+            miss_threshold=_clamp_int(
+                adaptation_raw.get("miss_threshold", 2),
+                lo=1,
+                hi=5,
+                default=2,
+            ),
+            max_delayed_gnarly=_clamp_int(
+                adaptation_raw.get("max_delayed_gnarly", 1),
+                lo=1,
+                hi=2,
+                default=1,
+            ),
+            cross_round=bool(adaptation_raw.get("cross_round", False)),
         ),
         "feedback": FeedbackSettings(
             analyze_on_ops_load=bool(feedback_raw.get("analyze_on_ops_load", True)),
@@ -392,6 +421,7 @@ def load_settings(
         recovery=parsed["recovery"],
         metrics=metrics,
         reports=reports,
+        adaptation=parsed["adaptation"],
         feedback=parsed["feedback"],
         server=parsed["server"],
         api_key=api_key,
