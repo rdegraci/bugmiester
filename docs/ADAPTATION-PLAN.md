@@ -78,11 +78,14 @@ Each phase is intended as **one reviewable commit** (merge or split as needed).
 
 **Exit:** Maintainable; players understand the coach line.
 
-### Phase 4 — Cross-round memory (optional)
+### Phase 4 — Cross-round memory
 
-- `weakness.json`: cluster hits/misses + decay
-- Record on round complete; bias thresholds or first Common slot
-- Caps so rounds do not become “10 concurrency bugs”
+- [x] `weakness.json` in Application Support (`weakness_memory.py`)
+- [x] Record hits/misses on round complete; clean-round miss decay
+- [x] Lower effective miss threshold when stored weakness is high
+- [x] Bias first Common slot toward weak cluster after rough sessions
+- [x] Ops: `stored_isolation_misses` + weakness snapshot in analyze
+- [x] Default `cross_round: true` in config + example
 
 **Exit:** Multi-session practice without accounts.
 
@@ -94,7 +97,7 @@ adaptation:
   cluster: isolation            # v1 cluster id
   miss_threshold: 2             # Common-band misses before delay (Phase 2)
   max_delayed_gnarly: 1         # cap delayed gnarly slots per round (Phase 2)
-  cross_round: false            # Phase 4
+  cross_round: true             # Phase 4: weakness.json across sessions
 ```
 
 ## Metrics fields (per bug in round log)

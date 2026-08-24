@@ -59,6 +59,12 @@ from bugmiester.seed_memory import (
     load_recent_rounds,
     record_completed_round_seeds,
 )
+from bugmiester.weakness_memory import (
+    effective_miss_threshold,
+    get_cluster_misses,
+    record_completed_round_weakness,
+    should_bias_first_common_slot,
+)
 from bugmiester.scoring import score_answer
 
 _LIVE_PROVIDERS = frozenset({"openai", "anthropic", "xai"})
@@ -162,6 +168,8 @@ class RoundState:
     adaptation_cluster: str = "isolation"
     adaptation_miss_threshold: int = 2
     adaptation_max_delayed_gnarly: int = 1
+    adaptation_cross_round: bool = False
+    cross_round_weakness_misses: int = 0
     complete: bool = False
 
 
@@ -193,12 +201,25 @@ class RoundStore:
             state.adaptation_cluster,
             state.bugs_per_round,
         )
+        threshold = state.adaptation_miss_threshold
+        if state.adaptation_cross_round:
+            threshold = effective_miss_threshold(
+                threshold,
+                state.cross_round_weakness_misses,
+                cross_round=True,
+            )
+        first_common = should_bias_first_common_slot(
+            state.cross_round_weakness_misses,
+            cross_round=state.adaptation_cross_round,
+            base_threshold=state.adaptation_miss_threshold,
+        )
         return {
             "adaptation_enabled": True,
             "cluster_misses": misses,
-            "miss_threshold": state.adaptation_miss_threshold,
+            "miss_threshold": threshold,
             "max_delayed_gnarly": state.adaptation_max_delayed_gnarly,
             "adaptation_cluster": state.adaptation_cluster,
+            "cross_round_first_common": first_common,
         }
 
     def _difficulty_label(self, state: RoundState, index: int) -> str:
@@ -251,9 +272,14 @@ class RoundStore:
         bugs = settings.game.bugs_per_round
         points = settings.scoring.points_per_bug
         recent_ids: tuple[str, ...] = ()
+        cross_round_misses = 0
         if settings.freshness.recent_seed_rounds > 0:
             recent_ids = tuple(
                 flatten_recent_seed_ids(load_recent_rounds(settings.app_dir))
+            )
+        if settings.adaptation.enabled and settings.adaptation.cross_round:
+            cross_round_misses = get_cluster_misses(
+                settings.app_dir, settings.adaptation.cluster
             )
         state = RoundState(
             round_id=round_id,
@@ -270,6 +296,8 @@ class RoundStore:
             adaptation_cluster=settings.adaptation.cluster,
             adaptation_miss_threshold=settings.adaptation.miss_threshold,
             adaptation_max_delayed_gnarly=settings.adaptation.max_delayed_gnarly,
+            adaptation_cross_round=settings.adaptation.cross_round,
+            cross_round_weakness_misses=cross_round_misses,
         )
         self._rounds[round_id] = state
         if settings.metrics.log_per_bug:
@@ -320,6 +348,10 @@ class RoundStore:
                 mix=state.seed_mix,
                 bugs_per_round=state.bugs_per_round,
                 adaptation_cluster_misses=int(adapt_kw.get("cluster_misses", 0)),
+                adaptation_miss_threshold=int(adapt_kw.get("miss_threshold", 2)),
+                cross_round_first_common_bias=bool(
+                    adapt_kw.get("cross_round_first_common")
+                ),
             )
         except Exception as exc:
             mapped = _map_provider_error(exc)
@@ -779,6 +811,14 @@ class RoundStore:
             seed_ids=seed_ids,
             keep_rounds=settings.freshness.recent_seed_rounds,
         )
+        if settings.adaptation.enabled and settings.adaptation.cross_round:
+            record_completed_round_weakness(
+                settings.app_dir,
+                round_id=state.round_id,
+                cluster=state.adaptation_cluster,
+                bugs=self._answered_bugs(state),
+                bugs_per_round=state.bugs_per_round,
+            )
         if settings.metrics.log_per_bug:
             self.metrics.flush_round(
                 settings.logs_dir,

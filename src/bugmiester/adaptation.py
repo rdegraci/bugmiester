@@ -127,6 +127,33 @@ def count_cluster_misses(
     return total
 
 
+def tally_cluster_common_outcomes(
+    bugs: Sequence[AnsweredBug],
+    cluster: str,
+    bugs_per_round: int,
+) -> tuple[int, int]:
+    """Return (hits, misses) for clustered categories in the base Common window."""
+    categories = cluster_category_set(cluster)
+    if not categories:
+        return 0, 0
+    hits = 0
+    misses = 0
+    for bug in bugs:
+        if not bug.answered or bug.recovery_open:
+            continue
+        if not is_common_window_index(bug.index, bugs_per_round):
+            continue
+        if bug.bug_category not in categories:
+            continue
+        if bug.correct is None:
+            continue
+        if is_clear_miss(bug):
+            misses += 1
+        elif bug.correct:
+            hits += 1
+    return hits, misses
+
+
 def compute_gnarly_delay(
     cluster_misses: int,
     miss_threshold: int,

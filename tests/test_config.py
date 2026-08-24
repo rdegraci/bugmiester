@@ -180,7 +180,7 @@ def test_load_settings_adaptation_defaults(tmp_path: Path) -> None:
     assert settings.adaptation.cluster == "isolation"
     assert settings.adaptation.miss_threshold == 2
     assert settings.adaptation.max_delayed_gnarly == 1
-    assert settings.adaptation.cross_round is False
+    assert settings.adaptation.cross_round is True
 
 
 def test_load_settings_adaptation_section(tmp_path: Path) -> None:

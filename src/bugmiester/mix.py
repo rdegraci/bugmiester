@@ -204,6 +204,7 @@ def preferred_categories(
     miss_threshold: int = 2,
     max_delayed_gnarly: int = 1,
     adaptation_cluster: str = "isolation",
+    cross_round_first_common_bias: bool = False,
 ) -> frozenset[str] | None:
     """
     Category set to try first, or None for an unweighted (intermediate) draw.
@@ -229,6 +230,17 @@ def preferred_categories(
         return SLOP_MIX_CATEGORIES
     if phase == "gnarly":
         return GNARLY_CATEGORIES
+
+    if (
+        cross_round_first_common_bias
+        and phase == "senior"
+        and len(used_seeds) == slop_quota(bugs_per_round)
+    ):
+        from bugmiester.adaptation import cluster_category_set
+
+        bias = cluster_category_set(adaptation_cluster) & SENIOR_CORE_CATEGORIES
+        if bias:
+            return bias
 
     from bugmiester.adaptation import (
         cluster_category_set,

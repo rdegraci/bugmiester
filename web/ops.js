@@ -10,6 +10,7 @@
     kpiJudge: document.getElementById("kpi-judge"),
     kpiReinforce: document.getElementById("kpi-reinforce"),
     kpiIsolationMiss: document.getElementById("kpi-isolation-miss"),
+    kpiWeaknessMisses: document.getElementById("kpi-weakness-misses"),
     reasonsBody: document.getElementById("reasons-body"),
     alertsList: document.getElementById("alerts-list"),
     reportsBody: document.getElementById("reports-body"),
@@ -82,6 +83,11 @@
       els.kpiIsolationMiss.textContent = pct(
         adaptation.isolation_common_miss_rate
       );
+    }
+    if (els.kpiWeaknessMisses) {
+      const stored = adaptation.stored_isolation_misses;
+      els.kpiWeaknessMisses.textContent =
+        stored == null || stored === undefined ? "—" : String(stored);
     }
 
     clearChildren(els.reasonsBody);

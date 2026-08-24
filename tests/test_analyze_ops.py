@@ -176,6 +176,43 @@ def test_analyze_adaptation_metrics_from_logs(tmp_path: Path) -> None:
     assert adapt["isolation_common_miss_rate"] == 1.0
 
 
+def test_analyze_includes_weakness_snapshot(tmp_path: Path) -> None:
+    app_dir = tmp_path / "app"
+    reports = app_dir / "reports"
+    logs = app_dir / "logs"
+    reports.mkdir(parents=True)
+    logs.mkdir(parents=True)
+
+    from bugmiester.weakness_memory import record_completed_round_weakness
+    from bugmiester.adaptation import AnsweredBug
+
+    record_completed_round_weakness(
+        app_dir,
+        round_id="r1",
+        cluster="isolation",
+        bugs=[
+            AnsweredBug(
+                index=3,
+                bug_category="concurrency",
+                answered=True,
+                correct=False,
+                partial=False,
+                player_answer="idk",
+            )
+        ],
+        bugs_per_round=10,
+    )
+    (logs / "round_empty.json").write_text(
+        '{"round_id":"r0","bugs_per_round":10,"bugs":[]}\n',
+        encoding="utf-8",
+    )
+
+    summary = analyze(reports, logs, persist=False)
+    adapt = summary["adaptation"]
+    assert adapt["stored_isolation_misses"] == 1
+    assert adapt["weakness"]["clusters"]["isolation"]["misses"] == 1
+
+
 def test_ops_api_and_cli_after_mock_round(
     tmp_path: Path, monkeypatch, capsys
 ) -> None:

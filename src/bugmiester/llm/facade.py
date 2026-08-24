@@ -118,6 +118,8 @@ def generate_bug(
     mix: str | None = None,
     bugs_per_round: int | None = None,
     adaptation_cluster_misses: int = 0,
+    adaptation_miss_threshold: int | None = None,
+    cross_round_first_common_bias: bool = False,
 ) -> GenerateBugResult:
     """
     Generate one validated snippet.
@@ -162,9 +164,14 @@ def generate_bug(
         ),
         adaptation_enabled=settings.adaptation.enabled,
         cluster_misses=adaptation_cluster_misses if settings.adaptation.enabled else 0,
-        miss_threshold=settings.adaptation.miss_threshold,
+        miss_threshold=(
+            adaptation_miss_threshold
+            if adaptation_miss_threshold is not None
+            else settings.adaptation.miss_threshold
+        ),
         max_delayed_gnarly=settings.adaptation.max_delayed_gnarly,
         adaptation_cluster=settings.adaptation.cluster,
+        cross_round_first_common_bias=cross_round_first_common_bias,
         generate_raw_fn=generate_raw_fn,
         parse_raw=parse_raw,
         fallback_fn=fallback_for_seed,

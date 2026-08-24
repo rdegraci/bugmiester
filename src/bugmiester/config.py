@@ -105,7 +105,7 @@ class AdaptationSettings:
     cluster: str = "isolation"
     miss_threshold: int = 2
     max_delayed_gnarly: int = 1
-    cross_round: bool = False
+    cross_round: bool = True
 
 
 @dataclass(frozen=True)
@@ -278,7 +278,7 @@ def _parse_yaml_config(raw: Mapping[str, Any]) -> dict[str, Any]:
                 hi=2,
                 default=1,
             ),
-            cross_round=bool(adaptation_raw.get("cross_round", False)),
+            cross_round=bool(adaptation_raw.get("cross_round", True)),
         ),
         "feedback": FeedbackSettings(
             analyze_on_ops_load=bool(feedback_raw.get("analyze_on_ops_load", True)),

@@ -69,7 +69,11 @@ def _bug_entries(round_logs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return bugs
 
 
-def _adaptation_summary(round_logs: list[dict[str, Any]]) -> dict[str, Any]:
+def _adaptation_summary(
+    round_logs: list[dict[str, Any]],
+    *,
+    app_dir: Path | None = None,
+) -> dict[str, Any]:
     reinforce_actions = 0
     rounds_with_reinforce = 0
     isolation_scored = 0
@@ -110,6 +114,15 @@ def _adaptation_summary(round_logs: list[dict[str, Any]]) -> dict[str, Any]:
     isolation_miss_rate = (
         round(isolation_misses / isolation_scored, 4) if isolation_scored else 0.0
     )
+    weakness: dict[str, Any] = {"clusters": {}}
+    stored_isolation_misses = 0
+    if app_dir is not None:
+        from bugmiester.weakness_memory import weakness_snapshot
+
+        weakness = weakness_snapshot(app_dir)
+        isolation_row = weakness.get("clusters", {}).get("isolation", {})
+        if isinstance(isolation_row, dict):
+            stored_isolation_misses = int(isolation_row.get("misses") or 0)
     return {
         "reinforce_actions": reinforce_actions,
         "rounds_with_reinforce": rounds_with_reinforce,
@@ -117,6 +130,8 @@ def _adaptation_summary(round_logs: list[dict[str, Any]]) -> dict[str, Any]:
         "isolation_common_scored": isolation_scored,
         "isolation_common_misses": isolation_misses,
         "isolation_common_miss_rate": isolation_miss_rate,
+        "stored_isolation_misses": stored_isolation_misses,
+        "weakness": weakness,
     }
 
 
@@ -244,7 +259,7 @@ def analyze(
         for name, count in seed_counts.most_common(TOP_N)
     ]
 
-    adaptation = _adaptation_summary(round_logs)
+    adaptation = _adaptation_summary(round_logs, app_dir=logs_dir.parent)
 
     summary: dict[str, Any] = {
         "generated_at": _utc_now_iso(),
